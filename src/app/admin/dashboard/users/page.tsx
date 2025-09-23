@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Search, Filter, Download, MoreHorizontal, Eye, Edit, Trash2, UserCheck, UserX } from "lucide-react"
+import { toast } from "sonner"
 
 // Dummy data for users
 const dummyUsers = [
@@ -81,6 +83,8 @@ export default function AdminUsersPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState("ALL")
   const [statusFilter, setStatusFilter] = useState("ALL")
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+  const [isSelectAll, setIsSelectAll] = useState(false)
 
   const filteredUsers = dummyUsers.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -91,9 +95,75 @@ export default function AdminUsersPage() {
     return matchesSearch && matchesRole && matchesStatus
   })
 
-  const handleExportCSV = () => {
-    // CSV export logic would go here
-    console.log("Exporting users to CSV...")
+  const handleSelectUser = (userId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedUsers(prev => [...prev, userId])
+    } else {
+      setSelectedUsers(prev => prev.filter(id => id !== userId))
+    }
+  }
+
+  const handleSelectAll = (checked: boolean) => {
+    setIsSelectAll(checked)
+    if (checked) {
+      setSelectedUsers(filteredUsers.map(user => user.id))
+    } else {
+      setSelectedUsers([])
+    }
+  }
+
+  const handleExportCSV = useCallback(() => {
+    if (selectedUsers.length === 0) {
+      toast.error("Please select users to export")
+      return
+    }
+
+    const usersToExport = dummyUsers.filter(user => selectedUsers.includes(user.id))
+    
+    // Create CSV content
+    const headers = ["Name", "Email", "Role", "Status", "Join Date", "Last Login", "Profile Completed"]
+    const csvContent = [
+      headers.join(","),
+      ...usersToExport.map(user => [
+        user.name,
+        user.email,
+        user.role,
+        user.status,
+        user.joinDate,
+        user.lastLogin,
+        user.profileCompleted ? "Yes" : "No"
+      ].join(","))
+    ].join("\n")
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `users_${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    toast.success(`Exported ${usersToExport.length} users to CSV`)
+  }, [selectedUsers])
+
+  const handleBulkAction = (action: string) => {
+    if (selectedUsers.length === 0) {
+      toast.error("Please select users to perform bulk action")
+      return
+    }
+
+    const actionMessages = {
+      activate: `Activated ${selectedUsers.length} users`,
+      deactivate: `Deactivated ${selectedUsers.length} users`,
+      delete: `Deleted ${selectedUsers.length} users`,
+    }
+
+    toast.success(actionMessages[action as keyof typeof actionMessages] || "Bulk action completed")
+    setSelectedUsers([])
+    setIsSelectAll(false)
   }
 
   return (
@@ -105,6 +175,23 @@ export default function AdminUsersPage() {
           <p className="text-muted-foreground">Manage all users in the system</p>
         </div>
         <div className="flex gap-2">
+          {selectedUsers.length > 0 && (
+            <div className="flex gap-2">
+              <Select onValueChange={(value) => handleBulkAction(value)}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Bulk Actions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="activate">Activate</SelectItem>
+                  <SelectItem value="deactivate">Deactivate</SelectItem>
+                  <SelectItem value="delete">Delete</SelectItem>
+                </SelectContent>
+              </Select>
+              <Badge variant="secondary" className="flex items-center gap-1">
+                {selectedUsers.length} selected
+              </Badge>
+            </div>
+          )}
           <Button variant="outline" onClick={handleExportCSV}>
             <Download className="h-4 w-4 mr-2" />
             Export CSV
@@ -205,6 +292,13 @@ export default function AdminUsersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={isSelectAll}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all users"
+                    />
+                  </TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
@@ -218,6 +312,13 @@ export default function AdminUsersPage() {
               <TableBody>
                 {filteredUsers.map((user) => (
                   <TableRow key={user.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedUsers.includes(user.id)}
+                        onCheckedChange={(checked) => handleSelectUser(user.id, checked as boolean)}
+                        aria-label={`Select ${user.name}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
@@ -278,6 +379,12 @@ export default function AdminUsersPage() {
               </TableBody>
             </Table>
           </div>
+          
+          {filteredUsers.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              No users found matching your filters.
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
