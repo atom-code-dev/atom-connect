@@ -1,6 +1,10 @@
 "use client"
 
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import { useState } from "react"
+import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +15,13 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Plus, Search, Edit, Trash2, MoreHorizontal, Settings } from "lucide-react"
+
+interface User {
+  id: string
+  email: string
+  role: string
+  name: string
+}
 
 // Dummy data for training categories
 const dummyCategories = [
@@ -45,6 +56,9 @@ const dummyCategories = [
 ]
 
 export default function AdminTrainingsPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState(null)
@@ -53,6 +67,35 @@ export default function AdminTrainingsPage() {
     description: "",
     isActive: true,
   })
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/")
+      return
+    }
+    
+    if (status === "authenticated" && session?.user?.role !== "ADMIN") {
+      router.push("/")
+      return
+    }
+  }, [status, session, router])
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session || session.user.role !== "ADMIN") {
+    return null
+  }
+
+  const user = session.user
 
   const filteredCategories = dummyCategories.filter(category =>
     category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -83,7 +126,8 @@ export default function AdminTrainingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <DashboardLayout userRole={user.role} userName={user.name || "Admin"}>
+      <div className="space-y-6">
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -299,6 +343,7 @@ export default function AdminTrainingsPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

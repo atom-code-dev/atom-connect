@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { User, LogOut, Settings } from "lucide-react"
 import { motion } from "framer-motion"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -141,6 +142,9 @@ export function DashboardLayout({ children, userRole, userName }: DashboardLayou
           </nav>
 
           <div className="p-4 border-t">
+            <div className="flex items-center gap-2 mb-3">
+              <ThemeToggle />
+            </div>
             <Button 
               variant="outline" 
               className="w-full justify-start"

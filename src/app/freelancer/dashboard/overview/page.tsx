@@ -1,7 +1,19 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { BookOpen, Users, TrendingUp, CheckCircle, Clock, Star, Briefcase, MapPin, DollarSign, Calendar } from "lucide-react"
+
+interface User {
+  id: string
+  email: string
+  role: string
+  name: string
+}
 
 // Dummy data for freelancer dashboard
 const dashboardStats = {
@@ -87,6 +99,29 @@ const freelancerProfile = {
 }
 
 export default function FreelancerDashboardOverview() {
+  const [user, setUser] = useState<User | null>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    const userData = localStorage.getItem("user")
+    if (!userData) {
+      router.push("/")
+      return
+    }
+    
+    const parsedUser = JSON.parse(userData)
+    if (parsedUser.role !== "FREELANCER") {
+      router.push("/")
+      return
+    }
+    
+    setUser(parsedUser)
+  }, [router])
+
+  if (!user) {
+    return <div>Loading...</div>
+  }
+
   const getStatusColor = (status) => {
     switch (status) {
       case "ACCEPTED":
@@ -116,9 +151,10 @@ export default function FreelancerDashboardOverview() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex justify-between items-center">
+    <DashboardLayout userRole={user.role} userName={user.name}>
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Freelancer Dashboard</h1>
           <p className="text-muted-foreground">Find trainings and manage your profile</p>
@@ -434,6 +470,7 @@ export default function FreelancerDashboardOverview() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

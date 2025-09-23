@@ -1,6 +1,10 @@
 "use client"
 
 import { useState } from "react"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -101,8 +105,39 @@ const feedbackData = {
 }
 
 export default function FreelancerFeedbackPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
   const [selectedFeedback, setSelectedFeedback] = useState<any>(null)
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false)
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/")
+      return
+    }
+    
+    if (status === "authenticated" && session?.user?.role !== "FREELANCER") {
+      router.push("/")
+      return
+    }
+  }, [status, session, router])
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session || session.user.role !== "FREELANCER") {
+    return null
+  }
+
+  const user = session.user
 
   const handleViewFeedback = (feedback: any) => {
     setSelectedFeedback(feedback)
@@ -126,7 +161,8 @@ export default function FreelancerFeedbackPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <DashboardLayout userRole={user.role} userName={user.name || "Freelancer"}>
+      <div className="space-y-6">
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -472,6 +508,7 @@ export default function FreelancerFeedbackPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

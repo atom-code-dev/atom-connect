@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Eye, EyeOff, User, Building, Settings, Users } from "lucide-react"
 import { toast } from "sonner"
 import { motion } from "framer-motion"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
 
 // Mock user credentials for demo
 const mockUsers = [
@@ -165,6 +166,11 @@ export default function LoginPage() {
       transition={{ duration: 0.5 }}
       className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4"
     >
+      {/* Theme toggle in top right corner */}
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
+      
       <div className="w-full max-w-md">
         {/* Logo and Title */}
         <motion.div 

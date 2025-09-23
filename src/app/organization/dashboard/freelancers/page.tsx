@@ -1,6 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +14,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Search, Filter, MapPin, Star, Calendar, Users, Briefcase, Linkedin, Mail, Phone, Eye } from "lucide-react"
+
+interface User {
+  id: string
+  email: string
+  role: string
+  name: string
+}
 
 // Dummy data for freelancers
 const dummyFreelancers = [
@@ -104,12 +114,44 @@ const trainerTypeColors = {
 }
 
 export default function OrganizationFreelancersPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
   const [searchTerm, setSearchTerm] = useState("")
   const [skillsFilter, setSkillsFilter] = useState("ALL")
   const [locationFilter, setLocationFilter] = useState("ALL")
   const [availabilityFilter, setAvailabilityFilter] = useState("ALL")
   const [trainerTypeFilter, setTrainerTypeFilter] = useState("ALL")
   const [selectedFreelancer, setSelectedFreelancer] = useState<any>(null)
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/")
+      return
+    }
+    
+    if (status === "authenticated" && session?.user?.role !== "ORGANIZATION") {
+      router.push("/")
+      return
+    }
+  }, [status, session, router])
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session || session.user.role !== "ORGANIZATION") {
+    return null
+  }
+
+  const user = session.user
 
   const filteredFreelancers = dummyFreelancers.filter(freelancer => {
     const matchesSearch = freelancer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -127,7 +169,8 @@ export default function OrganizationFreelancersPage() {
   const allLocations = Array.from(new Set(dummyFreelancers.map(f => f.location.split(", ")[1])))
 
   return (
-    <div className="space-y-6">
+    <DashboardLayout userRole={user.role} userName={user.name}>
+      <div className="space-y-6">
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -387,6 +430,7 @@ export default function OrganizationFreelancersPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

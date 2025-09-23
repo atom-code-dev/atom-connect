@@ -1,6 +1,10 @@
 "use client"
 
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import { useState, useCallback } from "react"
+import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +15,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Checkbox } from "@/components/ui/checkbox"
 import { Search, Filter, Download, MoreHorizontal, Eye, Edit, Trash2, UserCheck, UserX } from "lucide-react"
 import { toast } from "sonner"
+
+interface User {
+  id: string
+  email: string
+  role: string
+  name: string
+}
 
 // Dummy data for users
 const dummyUsers = [
@@ -80,37 +91,14 @@ const statusColors = {
 }
 
 export default function AdminUsersPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState("ALL")
   const [statusFilter, setStatusFilter] = useState("ALL")
   const [selectedUsers, setSelectedUsers] = useState<string[]>([])
   const [isSelectAll, setIsSelectAll] = useState(false)
-
-  const filteredUsers = dummyUsers.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesRole = roleFilter === "ALL" || user.role === roleFilter
-    const matchesStatus = statusFilter === "ALL" || user.status === statusFilter
-    
-    return matchesSearch && matchesRole && matchesStatus
-  })
-
-  const handleSelectUser = (userId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedUsers(prev => [...prev, userId])
-    } else {
-      setSelectedUsers(prev => prev.filter(id => id !== userId))
-    }
-  }
-
-  const handleSelectAll = (checked: boolean) => {
-    setIsSelectAll(checked)
-    if (checked) {
-      setSelectedUsers(filteredUsers.map(user => user.id))
-    } else {
-      setSelectedUsers([])
-    }
-  }
 
   const handleExportCSV = useCallback(() => {
     if (selectedUsers.length === 0) {
@@ -149,6 +137,61 @@ export default function AdminUsersPage() {
     toast.success(`Exported ${usersToExport.length} users to CSV`)
   }, [selectedUsers])
 
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/")
+      return
+    }
+    
+    if (status === "authenticated" && session?.user?.role !== "ADMIN") {
+      router.push("/")
+      return
+    }
+  }, [status, session, router])
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session || session.user.role !== "ADMIN") {
+    return null
+  }
+
+  const user = session.user
+
+  const filteredUsers = dummyUsers.filter(user => {
+    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesRole = roleFilter === "ALL" || user.role === roleFilter
+    const matchesStatus = statusFilter === "ALL" || user.status === statusFilter
+    
+    return matchesSearch && matchesRole && matchesStatus
+  })
+
+  const handleSelectUser = (userId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedUsers(prev => [...prev, userId])
+    } else {
+      setSelectedUsers(prev => prev.filter(id => id !== userId))
+    }
+  }
+
+  const handleSelectAll = (checked: boolean) => {
+    setIsSelectAll(checked)
+    if (checked) {
+      setSelectedUsers(filteredUsers.map(user => user.id))
+    } else {
+      setSelectedUsers([])
+    }
+  }
+
   const handleBulkAction = (action: string) => {
     if (selectedUsers.length === 0) {
       toast.error("Please select users to perform bulk action")
@@ -167,7 +210,8 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <DashboardLayout userRole={user.role} userName={user.name || "Admin"}>
+      <div className="space-y-6">
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -387,6 +431,7 @@ export default function AdminUsersPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

@@ -1,6 +1,10 @@
 "use client"
 
 import { useState } from "react"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -120,6 +124,8 @@ const statusColors = {
 }
 
 export default function FreelancerTrainingsPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("ALL")
   const [typeFilter, setTypeFilter] = useState("ALL")
@@ -129,6 +135,35 @@ export default function FreelancerTrainingsPage() {
   const [selectedTraining, setSelectedTraining] = useState<any>(null)
   const [isApplyDialogOpen, setIsApplyDialogOpen] = useState(false)
   const [applicationMessage, setApplicationMessage] = useState("")
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/")
+      return
+    }
+    
+    if (status === "authenticated" && session?.user?.role !== "FREELANCER") {
+      router.push("/")
+      return
+    }
+  }, [status, session, router])
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session || session.user.role !== "FREELANCER") {
+    return null
+  }
+
+  const user = session.user
 
   const filteredTrainings = dummyTrainings.filter(training => {
     const matchesSearch = training.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -167,7 +202,8 @@ export default function FreelancerTrainingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <DashboardLayout userRole={user.role} userName={user.name || "Freelancer"}>
+      <div className="space-y-6">
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -419,6 +455,7 @@ export default function FreelancerTrainingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

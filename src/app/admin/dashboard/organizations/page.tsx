@@ -1,6 +1,10 @@
 "use client"
 
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import { useState } from "react"
+import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,6 +14,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Search, Filter, Download, MoreHorizontal, Eye, Edit, Trash2, Building, CheckCircle, XCircle, Clock } from "lucide-react"
+
+interface User {
+  id: string
+  email: string
+  role: string
+  name: string
+}
 
 // Dummy data for organizations
 const dummyOrganizations = [
@@ -92,9 +103,41 @@ const activeStatusColors = {
 }
 
 export default function AdminOrganizationsPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
   const [searchTerm, setSearchTerm] = useState("")
   const [verificationFilter, setVerificationFilter] = useState("ALL")
   const [activeFilter, setActiveFilter] = useState("ALL")
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/")
+      return
+    }
+    
+    if (status === "authenticated" && session?.user?.role !== "ADMIN") {
+      router.push("/")
+      return
+    }
+  }, [status, session, router])
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session || session.user.role !== "ADMIN") {
+    return null
+  }
+
+  const user = session.user
 
   const filteredOrganizations = dummyOrganizations.filter(org => {
     const matchesSearch = org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -112,7 +155,8 @@ export default function AdminOrganizationsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <DashboardLayout userRole={user.role} userName={user.name || "Admin"}>
+      <div className="space-y-6">
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -341,6 +385,7 @@ export default function AdminOrganizationsPage() {
           </Tabs>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }
