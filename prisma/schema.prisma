@@ -1,32 +1,259 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+// User roles
+enum UserRole {
+  FREELANCER
+  ADMIN
+  ORGANIZATION
+  MAINTAINER
+}
+
+// Training categories
+enum TrainingCategory {
+  SOFT_SKILLS
+  FUNDAMENTALS
+  FRAMEWORKS
+}
+
+// Training types
+enum TrainingType {
+  CORPORATE
+  UNIVERSITY
+}
+
+// Trainer types
+enum TrainerType {
+  UNIVERSITY
+  CORPORATE
+  BOTH
+}
+
+// Availability status
+enum AvailabilityStatus {
+  AVAILABLE
+  IN_TRAINING
+  NOT_AVAILABLE
+}
+
+// Verification status
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+// Active status
+enum ActiveStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// Base User model
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
+  password  String
   name      String?
+  phone     String?
+  role      UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  freelancerProfile FreelancerProfile?
+  organizationProfile OrganizationProfile?
+  adminProfile      AdminProfile?
+  maintainerProfile MaintainerProfile?
+  trainingFeedbacks TrainingFeedback[]
+}
+
+// Freelancer Profile
+model FreelancerProfile {
+  id               String            @id @default(cuid())
+  userId           String            @unique
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name             String
+  email            String
+  phone            String?
+  skills           String[]          // Frameworks and skills
+  trainerType      TrainerType
+  experience       String            // Experience description
+  linkedinProfile  String?
+  cv               String?           // File path
+  profilePicture   String?           // File path
+  activity         String?           // Activity description
+  availability     AvailabilityStatus @default(AVAILABLE)
+  location         String?
+  
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  // Relations
+  trainings        Training[]
+  feedbacks        TrainingFeedback[]
+}
+
+// Organization Profile
+model OrganizationProfile {
+  id               String            @id @default(cuid())
+  userId           String            @unique
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  organizationName String
+  website          String?
+  contactMail      String
+  phone            String?
+  verifiedStatus   VerificationStatus @default(PENDING)
+  companyLocation  String
+  activeStatus     ActiveStatus      @default(ACTIVE)
+  ratings          Float             @default(0)
+  logo             String?           // File path
+  
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  // Relations
+  trainings        Training[]
+  feedbacks        TrainingFeedback[]
+}
+
+// Admin Profile
+model AdminProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model Post {
+// Maintainer Profile
+model MaintainerProfile {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Training Categories Management
+model TrainingCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  trainings   Training[]
+}
+
+// Training Locations (States and Districts)
+model TrainingLocation {
+  id         String   @id @default(cuid())
+  state      String
+  district   String
+  isActive   Boolean  @default(true)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  trainings  Training[]
+}
+
+// Stacks and Frameworks
+model Stack {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  trainings   Training[]
+}
+
+// Training Postings
+model Training {
+  id             String            @id @default(cuid())
+  title          String
+  description    String
+  skills         String[]          // Required skills
+  categoryId     String
+  category       TrainingCategory  @relation(fields: [categoryId], references: [id])
+  type           TrainingType
+  locationId     String
+  location       TrainingLocation  @relation(fields: [locationId], references: [id])
+  stackId        String
+  stack          Stack             @relation(fields: [stackId], references: [id])
+  
+  // Company details
+  companyName    String
+  companyLogo    String?           // File path
+  
+  // Dates
+  startDate      DateTime
+  endDate        DateTime
+  
+  // Payment
+  paymentTerm    Int               // Payment term in days
+  paymentAmount  Float             // Payment amount
+  
+  // Status
+  isPublished    Boolean           @default(false)
+  isActive       Boolean           @default(true)
+  
+  // Relations
+  organizationId String
+  organization   OrganizationProfile @relation(fields: [organizationId], references: [id])
+  freelancerId   String?
+  freelancer     FreelancerProfile?  @relation(fields: [freelancerId], references: [id])
+  
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  // Relations
+  feedbacks      TrainingFeedback[]
+}
+
+// Training Feedback
+model TrainingFeedback {
+  id                  String   @id @default(cuid())
+  trainingId          String
+  training            Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  
+  // Ratings
+  organizationRating  Float
+  institutionName     String?
+  overallRating       Float?
+  foodAccommodation   Float
+  travelExperience    Float
+  paymentTermRating   Float
+  
+  // Comments
+  comments            String?
+  
+  // Relations
+  freelancerId        String
+  freelancer          FreelancerProfile @relation(fields: [freelancerId], references: [id])
+  organizationId      String
+  organization        OrganizationProfile @relation(fields: [organizationId], references: [id])
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
