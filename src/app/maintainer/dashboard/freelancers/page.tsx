@@ -1,5 +1,9 @@
 "use client"
 
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,7 +17,37 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Search, Filter, CheckCircle, XCircle, Clock, Eye, Users, AlertTriangle, Star, MapPin, Briefcase } from "lucide-react"
 
-// Dummy data for maintainer freelancers
+export default function MaintainerFreelancersPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (status === "loading") return
+    
+    if (!session) {
+      router.push("/")
+      return
+    }
+    
+    if (session.user?.role !== "MAINTAINER") {
+      router.push("/")
+      return
+    }
+  }, [session, status, router])
+
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return null
+  }
+
+  // Dummy data for maintainer freelancers
 const dummyFreelancers = [
   {
     id: "1",
@@ -180,31 +214,32 @@ export default function MaintainerFreelancersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Freelancers Management</h1>
-          <p className="text-muted-foreground">Review and manage freelancer profiles</p>
+    <DashboardLayout userRole={session.user?.role || ""} userName={session.user?.name || ""}>
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Freelancers Management</h1>
+            <p className="text-muted-foreground">Review and manage freelancer profiles</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline">
+              <Users className="h-4 w-4 mr-2" />
+              My Reviews
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline">
-            <Users className="h-4 w-4 mr-2" />
-            My Reviews
-          </Button>
-        </div>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Freelancers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dummyFreelancers.length}</div>
-          </CardContent>
-        </Card>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Total Freelancers</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{dummyFreelancers.length}</div>
+            </CardContent>
+          </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
@@ -483,6 +518,7 @@ export default function MaintainerFreelancersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

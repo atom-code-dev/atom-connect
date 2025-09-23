@@ -1,42 +1,42 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Users, Building, BookOpen, TrendingUp, AlertCircle, CheckCircle, Clock, Star } from "lucide-react"
 
-interface User {
-  id: string
-  email: string
-  role: string
-  name: string
-}
-
 export default function MaintainerPage() {
-  const [user, setUser] = useState<User | null>(null)
+  const { data: session, status } = useSession()
   const router = useRouter()
 
   useEffect(() => {
-    const userData = localStorage.getItem("user")
-    if (!userData) {
+    if (status === "loading") return
+    
+    if (!session) {
       router.push("/")
       return
     }
     
-    const parsedUser = JSON.parse(userData)
-    if (parsedUser.role !== "MAINTAINER") {
+    if (session.user?.role !== "MAINTAINER") {
       router.push("/")
       return
     }
-    
-    setUser(parsedUser)
-  }, [router])
+  }, [session, status, router])
 
-  if (!user) {
-    return <div>Loading...</div>
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return null
   }
 
   // Dummy data for maintainer dashboard
@@ -142,7 +142,7 @@ export default function MaintainerPage() {
   }
 
   return (
-    <DashboardLayout userRole={user.role} userName={user.name}>
+    <DashboardLayout userRole={session.user?.role || ""} userName={session.user?.name || ""}>
       <div className="space-y-6">
         {/* Page Header */}
         <div className="flex justify-between items-center">

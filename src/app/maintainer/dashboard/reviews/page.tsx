@@ -1,5 +1,9 @@
 "use client"
 
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,6 +17,36 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Search, Filter, CheckCircle, XCircle, Clock, Eye, Building, Users, BookOpen, AlertTriangle, Star } from "lucide-react"
+
+export default function MaintainerReviewsPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (status === "loading") return
+    
+    if (!session) {
+      router.push("/")
+      return
+    }
+    
+    if (session.user?.role !== "MAINTAINER") {
+      router.push("/")
+      return
+    }
+  }, [session, status, router])
+
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return null
+  }
 
 // Dummy data for reviews
 const dummyReviews = {
@@ -215,7 +249,8 @@ export default function MaintainerReviewsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <DashboardLayout userRole={session.user?.role || ""} userName={session.user?.name || ""}>
+      <div className="space-y-6">
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -585,6 +620,7 @@ export default function MaintainerReviewsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

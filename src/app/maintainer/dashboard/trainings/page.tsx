@@ -1,5 +1,9 @@
 "use client"
 
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,6 +17,36 @@ import { Textarea } from "@/components/ui/textarea"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Search, Filter, CheckCircle, XCircle, Clock, Eye, Edit, Trash2, BookOpen, MapPin, DollarSign, Users, Calendar } from "lucide-react"
 import { format } from "date-fns"
+
+export default function MaintainerTrainingsPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (status === "loading") return
+    
+    if (!session) {
+      router.push("/")
+      return
+    }
+    
+    if (session.user?.role !== "MAINTAINER") {
+      router.push("/")
+      return
+    }
+  }, [session, status, router])
+
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return null
+  }
 
 // Dummy data for maintainer trainings
 const dummyTrainings = [
@@ -184,7 +218,8 @@ export default function MaintainerTrainingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <DashboardLayout userRole={session.user?.role || ""} userName={session.user?.name || ""}>
+      <div className="space-y-6">
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -465,6 +500,7 @@ export default function MaintainerTrainingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

@@ -1,3 +1,9 @@
+"use client"
+
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -80,6 +86,35 @@ const pendingItems = [
 ]
 
 export default function MaintainerDashboardOverview() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (status === "loading") return
+    
+    if (!session) {
+      router.push("/")
+      return
+    }
+    
+    if (session.user?.role !== "MAINTAINER") {
+      router.push("/")
+      return
+    }
+  }, [session, status, router])
+
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return null
+  }
+
   const getPriorityColor = (priority) => {
     switch (priority) {
       case "HIGH":
@@ -107,9 +142,10 @@ export default function MaintainerDashboardOverview() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex justify-between items-center">
+    <DashboardLayout userRole={session.user?.role || ""} userName={session.user?.name || ""}>
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Maintainer Dashboard</h1>
           <p className="text-muted-foreground">Review and manage platform content</p>
@@ -336,6 +372,7 @@ export default function MaintainerDashboardOverview() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }
