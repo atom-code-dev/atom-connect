@@ -19,7 +19,7 @@ enum UserRole {
 }
 
 // Training categories
-enum TrainingCategory {
+enum TrainingCategoryEnum {
   SOFT_SKILLS
   FUNDAMENTALS
   FRAMEWORKS
@@ -253,6 +253,8 @@ model TrainingFeedback {
   freelancer          FreelancerProfile @relation(fields: [freelancerId], references: [id])
   organizationId      String
   organization        OrganizationProfile @relation(fields: [organizationId], references: [id])
+  userId              String
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
