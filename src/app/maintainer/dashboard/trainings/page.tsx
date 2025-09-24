@@ -159,6 +159,8 @@ const statusColors = {
 }
 
 export default function MaintainerTrainingsPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("ALL")
   const [categoryFilter, setCategoryFilter] = useState("ALL")
@@ -167,6 +169,35 @@ export default function MaintainerTrainingsPage() {
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
   const [reviewDecision, setReviewDecision] = useState("")
   const [reviewComments, setReviewComments] = useState("")
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/")
+      return
+    }
+    
+    if (status === "authenticated" && session?.user?.role !== "MAINTAINER") {
+      router.push("/")
+      return
+    }
+  }, [status, session, router])
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!session || session.user.role !== "MAINTAINER") {
+    return null
+  }
+
+  const user = session.user
 
   const filteredTrainings = dummyTrainings.filter(training => {
     const matchesSearch = training.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -217,10 +248,8 @@ export default function MaintainerTrainingsPage() {
     console.log("Toggling publish status for training:", trainingId, "to", !currentStatus)
   }
 
-  }
-
   return (
-    <DashboardLayout userRole={session.user?.role || ""} userName={session.user?.name || ""}>
+    <DashboardLayout userRole={user.role} userName={user.name || user.email || "Maintainer"}>
       <div className="space-y-6">
       {/* Page Header */}
       <div className="flex justify-between items-center">
