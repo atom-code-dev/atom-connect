@@ -217,6 +217,8 @@ export default function MaintainerTrainingsPage() {
     console.log("Toggling publish status for training:", trainingId, "to", !currentStatus)
   }
 
+  }
+
   return (
     <DashboardLayout userRole={session.user?.role || ""} userName={session.user?.name || ""}>
       <div className="space-y-6">

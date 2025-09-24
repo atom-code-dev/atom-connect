@@ -1,5 +1,6 @@
 "use client"
 
+import React from "react"
 import { useSession, signOut } from "next-auth/react"
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState, useMemo } from "react"
@@ -23,21 +24,14 @@ interface NavItem {
   icon: React.ReactNode
 }
 
-export function DashboardLayout({ children, userRole, userName }: DashboardLayoutProps) {
-  const { data: session, status } = useSession()
-  const router = useRouter()
-  const pathname = usePathname()
+interface SidebarProps {
+  userRole: string
+  userName: string
+  pathname: string
+  onLogout: () => void
+}
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/")
-    }
-  }, [status, router])
-
-  const handleLogout = () => {
-    signOut({ callbackUrl: "/" })
-  }
-
+const Sidebar = React.memo(({ userRole, userName, pathname, onLogout }: SidebarProps) => {
   const getNavItems = useMemo((): NavItem[] => {
     const baseItems = [
       { href: `/${userRole.toLowerCase()}`, label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> }
@@ -81,6 +75,88 @@ export function DashboardLayout({ children, userRole, userName }: DashboardLayou
 
   const navItems = getNavItems
 
+  return (
+    <motion.div 
+      initial={{ x: -100 }}
+      animate={{ x: 0 }}
+      transition={{ duration: 0.3, delay: 0.1 }}
+      className="w-64 bg-card border-r flex flex-col"
+    >
+      <div className="p-6 border-b">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+            <Settings className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h2 className="font-semibold truncate">{userName}</h2>
+            <Badge variant="outline" className="text-xs">
+              {userRole}
+            </Badge>
+          </div>
+        </div>
+      </div>
+      
+      <nav className="flex-1 mt-6">
+        <div className="px-4 space-y-1">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href || 
+                            (item.href !== `/${userRole.toLowerCase()}` && pathname.startsWith(item.href))
+            
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center justify-between w-full px-4 py-2 text-sm hover:bg-accent rounded-md transition-colors group"
+              >
+                <div className="flex items-center gap-3">
+                  {item.icon}
+                  <span className={isActive ? "font-medium text-primary" : ""}>
+                    {item.label}
+                  </span>
+                </div>
+                {isActive && (
+                  <ChevronRight className="h-4 w-4 text-primary" />
+                )}
+              </Link>
+            )
+          })}
+        </div>
+      </nav>
+
+      <div className="p-4 border-t">
+        <div className="flex items-center gap-2 mb-3">
+          <ThemeToggle />
+        </div>
+        <Button 
+          variant="outline" 
+          className="w-full justify-start"
+          onClick={onLogout}
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Logout
+        </Button>
+      </div>
+    </motion.div>
+  )
+})
+
+Sidebar.displayName = "Sidebar"
+
+export function DashboardLayout({ children, userRole, userName }: DashboardLayoutProps) {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  const pathname = usePathname()
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/")
+    }
+  }, [status, router])
+
+  const handleLogout = () => {
+    signOut({ callbackUrl: "/" })
+  }
+
   if (status === "loading") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -100,68 +176,13 @@ export function DashboardLayout({ children, userRole, userName }: DashboardLayou
       className="min-h-screen bg-background"
     >
       <div className="flex h-screen">
-        {/* Sidebar */}
-        <motion.div 
-          initial={{ x: -100 }}
-          animate={{ x: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          className="w-64 bg-card border-r flex flex-col"
-        >
-          <div className="p-6 border-b">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <Settings className="h-4 w-4 text-white" />
-              </div>
-              <div>
-                <h2 className="font-semibold truncate">{userName}</h2>
-                <Badge variant="outline" className="text-xs">
-                  {userRole}
-                </Badge>
-              </div>
-            </div>
-          </div>
-          
-          <nav className="flex-1 mt-6">
-            <div className="px-4 space-y-1">
-              {navItems.map((item, index) => {
-                const isActive = pathname === item.href || 
-                                (item.href !== `/${userRole.toLowerCase()}` && pathname.startsWith(item.href))
-                
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="flex items-center justify-between w-full px-4 py-2 text-sm hover:bg-accent rounded-md transition-colors group"
-                  >
-                    <div className="flex items-center gap-3">
-                      {item.icon}
-                      <span className={isActive ? "font-medium text-primary" : ""}>
-                        {item.label}
-                      </span>
-                    </div>
-                    {isActive && (
-                      <ChevronRight className="h-4 w-4 text-primary" />
-                    )}
-                  </Link>
-                )
-              })}
-            </div>
-          </nav>
-
-          <div className="p-4 border-t">
-            <div className="flex items-center gap-2 mb-3">
-              <ThemeToggle />
-            </div>
-            <Button 
-              variant="outline" 
-              className="w-full justify-start"
-              onClick={handleLogout}
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </motion.div>
+        {/* Sidebar - now memoized to prevent unnecessary re-renders */}
+        <Sidebar 
+          userRole={userRole}
+          userName={userName}
+          pathname={pathname}
+          onLogout={handleLogout}
+        />
         
         {/* Main content */}
         <motion.div 

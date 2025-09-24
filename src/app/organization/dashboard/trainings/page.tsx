@@ -216,7 +216,7 @@ export default function OrganizationTrainingsPage() {
   }
 
   return (
-    <DashboardLayout userRole={user.role} userName={user.name}>
+    <DashboardLayout userRole={user.role} userName={user.name || user.email || "Organization"}>
       <div className="space-y-6">
       {/* Page Header */}
       <div className="flex justify-between items-center">

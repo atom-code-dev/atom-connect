@@ -17,38 +17,6 @@ import { toast } from "sonner"
 import { motion } from "framer-motion"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
 
-// Mock user credentials for demo
-const mockUsers = [
-  {
-    id: "1",
-    email: "admin@example.com",
-    password: "admin123",
-    role: "ADMIN",
-    name: "Admin User"
-  },
-  {
-    id: "2",
-    email: "freelancer@example.com",
-    password: "freelancer123",
-    role: "FREELANCER",
-    name: "John Doe"
-  },
-  {
-    id: "3",
-    email: "organization@example.com",
-    password: "organization123",
-    role: "ORGANIZATION",
-    name: "TechCorp Solutions"
-  },
-  {
-    id: "4",
-    email: "maintainer@example.com",
-    password: "maintainer123",
-    role: "MAINTAINER",
-    name: "Alice Johnson"
-  }
-]
-
 export default function LoginPage() {
   const { data: session, status } = useSession()
   const [email, setEmail] = useState("")
@@ -124,27 +92,7 @@ export default function LoginPage() {
           toast.error("Login failed. Please check your credentials.")
         } else {
           toast.success("Login successful!")
-          
-          // Get user role from mock data for redirect
-          const user = mockUsers.find(u => u.email === email)
-          if (user) {
-            switch (user.role) {
-              case "ADMIN":
-                router.push("/admin")
-                break
-              case "FREELANCER":
-                router.push("/freelancer")
-                break
-              case "ORGANIZATION":
-                router.push("/organization")
-                break
-              case "MAINTAINER":
-                router.push("/maintainer")
-                break
-              default:
-                router.push("/")
-            }
-          }
+          // The redirect will be handled by the useEffect hook based on the session
         }
       } catch (err) {
         setError("Login failed. Please try again.")
@@ -153,11 +101,7 @@ export default function LoginPage() {
     })
   }
 
-  const handleQuickLogin = (user: typeof mockUsers[0]) => {
-    setEmail(user.email)
-    setPassword(user.password)
-    setSelectedRole(user.role)
-  }
+  
 
   return (
     <motion.div 
@@ -272,46 +216,6 @@ export default function LoginPage() {
                   {isPending ? "Signing in..." : "Sign In"}
                 </Button>
               </form>
-
-              <div className="mt-6">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
-                      Quick Login
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-2">
-                  {mockUsers.map((user, index) => (
-                    <motion.div
-                      key={user.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3, delay: 0.5 + index * 0.1 }}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                    >
-                      <div className="flex items-center gap-2">
-                        {user.role === "ADMIN" && <User className="h-4 w-4" />}
-                        {user.role === "FREELANCER" && <Users className="h-4 w-4" />}
-                        {user.role === "ORGANIZATION" && <Building className="h-4 w-4" />}
-                        {user.role === "MAINTAINER" && <Settings className="h-4 w-4" />}
-                        <span className="text-sm font-medium">{user.role}</span>
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleQuickLogin(user)}
-                      >
-                        Use
-                      </Button>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
             </CardContent>
           </Card>
         </motion.div>
@@ -322,8 +226,7 @@ export default function LoginPage() {
           transition={{ duration: 0.5, delay: 0.8 }}
           className="mt-6 text-center text-sm text-gray-600"
         >
-          <p>Demo credentials are provided above for quick access.</p>
-          <p className="mt-1">Click "Use" to auto-fill the form.</p>
+          <p>Please contact your administrator for login credentials.</p>
         </motion.div>
       </div>
     </motion.div>

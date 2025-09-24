@@ -18,8 +18,7 @@ export async function GET() {
       totalFreelancers,
       totalMaintainers,
       totalTrainings,
-      activeTrainings,
-      pendingVerifications
+      activeTrainings
     ] = await Promise.all([
       db.user.count(),
       db.user.count({ where: { role: 'ORGANIZATION' } }),
@@ -32,13 +31,14 @@ export async function GET() {
           startDate: { lte: new Date() },
           endDate: { gte: new Date() }
         }
-      }),
-      db.organizationProfile.count({ 
-        where: { verifiedStatus: 'PENDING' }
-      }) + db.freelancerProfile.count({ 
-        where: { availability: 'NOT_AVAILABLE' }
       })
     ])
+
+    const pendingVerificationsCount = await db.organizationProfile.count({ 
+      where: { verifiedStatus: 'PENDING' }
+    }) + await db.freelancerProfile.count({ 
+      where: { availability: 'NOT_AVAILABLE' }
+    })
 
     // Get recent activities
     const recentActivities = await db.user.findMany({
@@ -74,7 +74,7 @@ export async function GET() {
         totalMaintainers,
         totalTrainings,
         activeTrainings,
-        pendingVerifications
+        pendingVerifications: pendingVerificationsCount
       },
       recentActivities: activities
     })

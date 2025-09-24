@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState, useCallback, useMemo } from "react"
+import { useEffect, useState, useCallback, useMemo, useTransition } from "react"
 import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -17,8 +17,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Edit, Trash2, MoreHorizontal, Settings, Download } from "lucide-react"
+import { Plus, Search, Edit, Trash2, MoreHorizontal, Settings, Download, Upload } from "lucide-react"
 import { toast } from "sonner"
+import { useForm, Controller } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { TrainingCategorySchema } from "@/schema"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 
 interface User {
   id: string
@@ -41,6 +45,7 @@ interface TrainingCategory {
 export default function AdminTrainingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const [isPending, startTransition] = useTransition()
 
   const [categories, setCategories] = useState<TrainingCategory[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,11 +55,16 @@ export default function AdminTrainingsPage() {
   const [editingCategory, setEditingCategory] = useState<TrainingCategory | null>(null)
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [isSelectAll, setIsSelectAll] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    isActive: true,
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+
+  const form = useForm({
+    resolver: zodResolver(TrainingCategorySchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      isActive: true,
+    },
   })
 
   const fetchCategories = useCallback(async () => {
@@ -97,6 +107,14 @@ export default function AdminTrainingsPage() {
     }
   }, [status, session, fetchCategories])
 
+  // Reset form when dialog is closed
+  useEffect(() => {
+    if (!isDialogOpen) {
+      setEditingCategory(null)
+      form.reset()
+    }
+  }, [isDialogOpen, form])
+
   const filteredCategories = useMemo(() => {
     return categories.filter(category =>
       category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -106,7 +124,7 @@ export default function AdminTrainingsPage() {
 
   const handleEdit = (category: TrainingCategory) => {
     setEditingCategory(category)
-    setFormData({
+    form.reset({
       name: category.name,
       description: category.description,
       isActive: category.isActive,
@@ -114,22 +132,14 @@ export default function AdminTrainingsPage() {
     setIsDialogOpen(true)
   }
 
-  const handleSave = async () => {
+  const handleSave = form.handleSubmit(async (data) => {
+  startTransition(async () => {
     try {
-      setIsSubmitting(true)
-      
-      if (!formData.name || !formData.description) {
-        toast.error("Name and description are required")
-        return
-      }
-
       const url = editingCategory ? '/api/training-categories' : '/api/training-categories'
       const method = editingCategory ? 'PUT' : 'POST'
       const body = {
         ...(editingCategory && { id: editingCategory.id }),
-        name: formData.name,
-        description: formData.description,
-        isActive: formData.isActive,
+        ...data,
       }
 
       const response = await fetch(url, {
@@ -148,15 +158,14 @@ export default function AdminTrainingsPage() {
       toast.success(`Training category ${editingCategory ? 'updated' : 'created'} successfully`)
       setIsDialogOpen(false)
       setEditingCategory(null)
-      setFormData({ name: "", description: "", isActive: true })
+      form.reset()
       fetchCategories()
     } catch (error) {
       console.error('Error saving category:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to save category')
-    } finally {
-      setIsSubmitting(false)
     }
-  }
+  })
+})
 
   const handleDelete = async (categoryId: string) => {
     try {
@@ -212,6 +221,67 @@ export default function AdminTrainingsPage() {
     
     toast.success(`Exported ${categoriesToExport.length} categories to CSV`)
   }, [selectedCategories, categories])
+
+  const handleImportCSV = async () => {
+    if (!importFile) {
+      toast.error("Please select a CSV file to import")
+      return
+    }
+
+    try {
+      const text = await importFile.text()
+      const lines = text.split('\n')
+      
+      if (lines.length < 2) {
+        toast.error("CSV file must contain at least a header row and one data row")
+        return
+      }
+
+      // Parse CSV (simple implementation)
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+      const categoriesToImport = []
+      
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim())
+        if (values.length >= 2) {
+          const category: any = {
+            name: values[headers.indexOf('name')] || values[0],
+            description: values[headers.indexOf('description')] || values[1],
+            isActive: (values[headers.indexOf('isactive')] || values[2] || 'true').toLowerCase() === 'true'
+          }
+          categoriesToImport.push(category)
+        }
+      }
+
+      if (categoriesToImport.length === 0) {
+        toast.error("No valid categories found in CSV file")
+        return
+      }
+
+      // Import categories
+      const response = await fetch('/api/training-categories/bulk-import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ categories: categoriesToImport }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to import categories')
+      }
+
+      const result = await response.json()
+      toast.success(`Successfully imported ${result.importedCount} categories. ${result.skippedCount} skipped.`)
+      setIsImportDialogOpen(false)
+      setImportFile(null)
+      fetchCategories()
+    } catch (error) {
+      console.error('Error importing CSV:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to import CSV')
+    }
+  }
 
   const handleSelectCategory = (categoryId: string, checked: boolean) => {
     if (checked) {
@@ -296,6 +366,50 @@ export default function AdminTrainingsPage() {
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
+          <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Upload className="h-4 w-4 mr-2" />
+                Import CSV
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Import Categories</DialogTitle>
+                <DialogDescription>
+                  Upload a CSV file to import training categories in bulk.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="csvFile">CSV File</Label>
+                  <Input
+                    id="csvFile"
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    CSV format: name, description, isActive (optional)
+                  </p>
+                </div>
+                {importFile && (
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <p className="text-sm font-medium">Selected file: {importFile.name}</p>
+                    <p className="text-xs text-muted-foreground">Size: {(importFile.size / 1024).toFixed(2)} KB</p>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleImportCSV} disabled={!importFile || isPending}>
+                  {isPending ? "Importing..." : "Import"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -315,50 +429,78 @@ export default function AdminTrainingsPage() {
                   }
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="name" className="text-right">
-                    Name
-                  </Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="col-span-3"
-                    placeholder="e.g., FRAMEWORKS"
+              <Form {...form}>
+                <form onSubmit={handleSave} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Name</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="e.g., FRAMEWORKS" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="description" className="text-right">
-                    Description
-                  </Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="col-span-3"
-                    placeholder="Describe this training category..."
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Describe this training category..." 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="isActive" className="text-right">
-                    Active
-                  </Label>
-                  <Switch
-                    id="isActive"
-                    checked={formData.isActive}
-                    onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+                  <FormField
+                    control={form.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Active</FormLabel>
+                          <FormDescription>
+                            Enable this category to be visible in the platform
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
                   />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={isSubmitting}>
-                  {isSubmitting ? "Saving..." : (editingCategory ? "Update" : "Save")}
-                </Button>
-              </DialogFooter>
+                  <DialogFooter>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => {
+                        setIsDialogOpen(false)
+                        setEditingCategory(null)
+                        form.reset()
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={isPending}>
+                      {isPending ? "Saving..." : (editingCategory ? "Update" : "Save")}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
             </DialogContent>
           </Dialog>
         </div>
