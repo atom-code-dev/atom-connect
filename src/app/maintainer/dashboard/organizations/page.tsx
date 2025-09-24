@@ -17,36 +17,6 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Search, Filter, CheckCircle, XCircle, Clock, Eye, Building, Users, AlertTriangle, Star } from "lucide-react"
 
-export default function MaintainerOrganizationsPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
-
-  useEffect(() => {
-    if (status === "loading") return
-    
-    if (!session) {
-      router.push("/")
-      return
-    }
-    
-    if (session.user?.role !== "MAINTAINER") {
-      router.push("/")
-      return
-    }
-  }, [session, status, router])
-
-  if (status === "loading") {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
-
-  if (!session) {
-    return null
-  }
-
 // Dummy data for maintainer organizations
 const dummyOrganizations = [
   {
@@ -138,6 +108,9 @@ const activeStatusColors = {
 }
 
 export default function MaintainerOrganizationsPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  
   const [searchTerm, setSearchTerm] = useState("")
   const [verificationFilter, setVerificationFilter] = useState("ALL")
   const [activeFilter, setActiveFilter] = useState("ALL")
@@ -145,6 +118,32 @@ export default function MaintainerOrganizationsPage() {
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
   const [reviewDecision, setReviewDecision] = useState("")
   const [reviewComments, setReviewComments] = useState("")
+
+  useEffect(() => {
+    if (status === "loading") return
+    
+    if (!session) {
+      router.push("/")
+      return
+    }
+    
+    if (session.user?.role !== "MAINTAINER") {
+      router.push("/")
+      return
+    }
+  }, [session, status, router])
+
+  if (status === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return null
+  }
 
   const filteredOrganizations = dummyOrganizations.filter(org => {
     const matchesSearch = org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -3,8 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { UserRole } from '@prisma/client'
-
-const bcrypt = require('bcryptjs')
+import * as bcrypt from 'bcryptjs'
 
 export async function GET() {
   try {

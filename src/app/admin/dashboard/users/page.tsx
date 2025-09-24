@@ -155,19 +155,6 @@ export default function AdminUsersPage() {
     toast.success(`Exported ${usersToExport.length} users to CSV`)
   }, [selectedUsers, users])
 
-  if (status === "loading" || !session || session.user.role !== "ADMIN") {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
-  const user = session.user
-
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
       const matchesSearch = (user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -183,6 +170,19 @@ export default function AdminUsersPage() {
       return matchesSearch && matchesRole && matchesStatus
     })
   }, [users, searchTerm, roleFilter, statusFilter])
+
+  if (status === "loading" || !session || session.user.role !== "ADMIN") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const user = session.user
 
   const handleSelectUser = (userId: string, checked: boolean) => {
     if (checked) {
