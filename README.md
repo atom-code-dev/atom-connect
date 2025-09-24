@@ -28,6 +28,74 @@ This scaffold provides a robust foundation built with:
 
 ### 🗄️ Database & Backend
 - **🗄️ Prisma** - Next-generation Node.js and TypeScript ORM
+- **🐘 PostgreSQL** - Production-ready relational database
+
+## 🗄️ Database Setup (PostgreSQL)
+
+This project uses PostgreSQL as the database. Follow these steps to set up your database:
+
+### 1. Install PostgreSQL
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+
+# macOS
+brew install postgresql
+
+# Windows
+# Download from https://www.postgresql.org/download/windows/
+```
+
+### 2. Create Database and User
+```bash
+# Connect to PostgreSQL
+sudo -u postgres psql
+
+# Create database
+CREATE DATABASE training_platform;
+
+# Create user (replace with your preferred credentials)
+CREATE USER postgres WITH PASSWORD 'password';
+
+# Grant privileges
+GRANT ALL PRIVILEGES ON DATABASE training_platform TO postgres;
+
+# Exit psql
+\q
+```
+
+### 3. Configure Environment Variables
+Copy the example environment file and update with your database credentials:
+
+```bash
+cp .env.example .env
+```
+
+Update the `DATABASE_URL` in your `.env` file:
+```
+DATABASE_URL="postgresql://postgres:password@localhost:5432/training_platform"
+```
+
+### 4. Run Database Migrations
+```bash
+# Generate Prisma client
+npm run db:generate
+
+# Push schema to database
+npm run db:push
+
+# (Optional) Run seed data
+npm run db:seed
+```
+
+### 5. Verify Database Connection
+```bash
+# Test the connection
+npm run db:push
+```
+
+If successful, you should see no errors and the database schema will be created.
 
 ### 🎨 Advanced UI Features
 - **📊 Recharts** - Redefined chart library built with React and D3
