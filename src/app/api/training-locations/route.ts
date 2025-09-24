@@ -13,19 +13,20 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
+    const isActive = searchParams.get('isActive')
 
     const where: any = {}
 
     if (search) {
       where.OR = [
         {
-          name: {
+          state: {
             contains: search,
             mode: 'insensitive' as const
           }
         },
         {
-          description: {
+          district: {
             contains: search,
             mode: 'insensitive' as const
           }
@@ -33,7 +34,11 @@ export async function GET(request: NextRequest) {
       ]
     }
 
-    const stacks = await db.stack.findMany({
+    if (isActive !== null && isActive !== '') {
+      where.isActive = isActive === 'true'
+    }
+
+    const locations = await db.trainingLocation.findMany({
       where,
       include: {
         trainings: {
@@ -45,19 +50,19 @@ export async function GET(request: NextRequest) {
         }
       },
       orderBy: {
-        name: 'asc'
+        state: 'asc'
       }
     })
 
-    const stacksWithCount = stacks.map(stack => ({
-      ...stack,
-      trainingsCount: stack.trainings.length,
-      activeTrainingsCount: stack.trainings.filter(t => t.isActive).length
+    const locationsWithCount = locations.map(location => ({
+      ...location,
+      trainingsCount: location.trainings.length,
+      activeTrainingsCount: location.trainings.filter(t => t.isActive).length
     }))
 
-    return NextResponse.json(stacksWithCount)
+    return NextResponse.json(locationsWithCount)
   } catch (error) {
-    console.error('Error fetching stacks:', error)
+    console.error('Error fetching training locations:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
@@ -71,25 +76,29 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, description } = body
+    const { state, district, isActive = true } = body
 
-    if (!name) {
+    if (!state || !district) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Check if stack with same name already exists
-    const existingStack = await db.stack.findUnique({
-      where: { name }
+    // Check if location with same state and district already exists
+    const existingLocation = await db.trainingLocation.findFirst({
+      where: {
+        state,
+        district
+      }
     })
 
-    if (existingStack) {
-      return NextResponse.json({ error: 'Stack with this name already exists' }, { status: 400 })
+    if (existingLocation) {
+      return NextResponse.json({ error: 'Location with this state and district already exists' }, { status: 400 })
     }
 
-    const stack = await db.stack.create({
+    const location = await db.trainingLocation.create({
       data: {
-        name,
-        description
+        state,
+        district,
+        isActive
       },
       include: {
         trainings: {
@@ -102,15 +111,15 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    const stackWithCount = {
-      ...stack,
-      trainingsCount: stack.trainings.length,
-      activeTrainingsCount: stack.trainings.filter(t => t.isActive).length
+    const locationWithCount = {
+      ...location,
+      trainingsCount: location.trainings.length,
+      activeTrainingsCount: location.trainings.filter(t => t.isActive).length
     }
 
-    return NextResponse.json(stackWithCount, { status: 201 })
+    return NextResponse.json(locationWithCount, { status: 201 })
   } catch (error) {
-    console.error('Error creating stack:', error)
+    console.error('Error creating training location:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
@@ -124,38 +133,40 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, name, description } = body
+    const { id, state, district, isActive } = body
 
-    if (!id || !name) {
+    if (!id || !state || !district) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Check if stack exists
-    const existingStack = await db.stack.findUnique({
+    // Check if location exists
+    const existingLocation = await db.trainingLocation.findUnique({
       where: { id }
     })
 
-    if (!existingStack) {
-      return NextResponse.json({ error: 'Stack not found' }, { status: 404 })
+    if (!existingLocation) {
+      return NextResponse.json({ error: 'Location not found' }, { status: 404 })
     }
 
-    // Check if another stack with same name exists
-    const nameConflict = await db.stack.findFirst({
+    // Check if another location with same state and district exists
+    const locationConflict = await db.trainingLocation.findFirst({
       where: {
-        name,
+        state,
+        district,
         id: { not: id }
       }
     })
 
-    if (nameConflict) {
-      return NextResponse.json({ error: 'Stack with this name already exists' }, { status: 400 })
+    if (locationConflict) {
+      return NextResponse.json({ error: 'Location with this state and district already exists' }, { status: 400 })
     }
 
-    const stack = await db.stack.update({
+    const location = await db.trainingLocation.update({
       where: { id },
       data: {
-        name,
-        description
+        state,
+        district,
+        isActive
       },
       include: {
         trainings: {
@@ -168,15 +179,15 @@ export async function PUT(request: NextRequest) {
       }
     })
 
-    const stackWithCount = {
-      ...stack,
-      trainingsCount: stack.trainings.length,
-      activeTrainingsCount: stack.trainings.filter(t => t.isActive).length
+    const locationWithCount = {
+      ...location,
+      trainingsCount: location.trainings.length,
+      activeTrainingsCount: location.trainings.filter(t => t.isActive).length
     }
 
-    return NextResponse.json(stackWithCount)
+    return NextResponse.json(locationWithCount)
   } catch (error) {
-    console.error('Error updating stack:', error)
+    console.error('Error updating training location:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
@@ -193,34 +204,34 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id')
 
     if (!id) {
-      return NextResponse.json({ error: 'Stack ID is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Location ID is required' }, { status: 400 })
     }
 
-    // Check if stack exists and has associated trainings
-    const stack = await db.stack.findUnique({
+    // Check if location exists and has associated trainings
+    const location = await db.trainingLocation.findUnique({
       where: { id },
       include: {
         trainings: true
       }
     })
 
-    if (!stack) {
-      return NextResponse.json({ error: 'Stack not found' }, { status: 404 })
+    if (!location) {
+      return NextResponse.json({ error: 'Location not found' }, { status: 404 })
     }
 
-    if (stack.trainings.length > 0) {
+    if (location.trainings.length > 0) {
       return NextResponse.json({ 
-        error: 'Cannot delete stack with associated trainings. Please reassign or delete the trainings first.' 
+        error: 'Cannot delete location with associated trainings. Please reassign or delete the trainings first.' 
       }, { status: 400 })
     }
 
-    await db.stack.delete({
+    await db.trainingLocation.delete({
       where: { id }
     })
 
-    return NextResponse.json({ success: true, message: 'Stack deleted successfully' })
+    return NextResponse.json({ success: true, message: 'Location deleted successfully' })
   } catch (error) {
-    console.error('Error deleting stack:', error)
+    console.error('Error deleting training location:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

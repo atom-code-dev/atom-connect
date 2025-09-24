@@ -17,20 +17,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Edit, Trash2, MoreHorizontal, Settings, Download, Upload } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Plus, Search, Edit, Trash2, MoreHorizontal, Settings, Download, Upload, MapPin, Code, FolderOpen, Grid3X3 } from "lucide-react"
 import { toast } from "sonner"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { TrainingCategorySchema } from "@/schema"
+import { TrainingCategorySchema, TrainingLocationSchema, StackSchema } from "@/schema"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 
-interface User {
-  id: string
-  email: string
-  role: string
-  name: string
-}
-
+// Interfaces
 interface TrainingCategory {
   id: string
   name: string
@@ -42,23 +37,65 @@ interface TrainingCategory {
   activeTrainingsCount: number
 }
 
+interface TrainingLocation {
+  id: string
+  state: string
+  district: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  trainingsCount: number
+  activeTrainingsCount: number
+}
+
+interface Stack {
+  id: string
+  name: string
+  description: string | null
+  createdAt: string
+  updatedAt: string
+  trainingsCount: number
+  activeTrainingsCount: number
+}
+
 export default function AdminTrainingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
+  // Categories state
   const [categories, setCategories] = useState<TrainingCategory[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [isActiveFilter, setIsActiveFilter] = useState("ALL")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingCategory, setEditingCategory] = useState<TrainingCategory | null>(null)
+  const [categoriesLoading, setCategoriesLoading] = useState(true)
+  const [categorySearchTerm, setCategorySearchTerm] = useState("")
+  const [categoryActiveFilter, setCategoryActiveFilter] = useState("ALL")
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-  const [isSelectAll, setIsSelectAll] = useState(false)
-  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
-  const [importFile, setImportFile] = useState<File | null>(null)
+  const [isCategorySelectAll, setIsCategorySelectAll] = useState(false)
 
-  const form = useForm({
+  // Locations state
+  const [locations, setLocations] = useState<TrainingLocation[]>([])
+  const [locationsLoading, setLocationsLoading] = useState(true)
+  const [locationSearchTerm, setLocationSearchTerm] = useState("")
+  const [locationActiveFilter, setLocationActiveFilter] = useState("ALL")
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  const [isLocationSelectAll, setIsLocationSelectAll] = useState(false)
+
+  // Stacks state
+  const [stacks, setStacks] = useState<Stack[]>([])
+  const [stacksLoading, setStacksLoading] = useState(true)
+  const [stackSearchTerm, setStackSearchTerm] = useState("")
+  const [selectedStacks, setSelectedStacks] = useState<string[]>([])
+  const [isStackSelectAll, setIsStackSelectAll] = useState(false)
+
+  // Dialog states
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
+  const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false)
+  const [isStackDialogOpen, setIsStackDialogOpen] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<TrainingCategory | null>(null)
+  const [editingLocation, setEditingLocation] = useState<TrainingLocation | null>(null)
+  const [editingStack, setEditingStack] = useState<Stack | null>(null)
+
+  // Forms
+  const categoryForm = useForm({
     resolver: zodResolver(TrainingCategorySchema),
     defaultValues: {
       name: "",
@@ -67,12 +104,30 @@ export default function AdminTrainingsPage() {
     },
   })
 
+  const locationForm = useForm({
+    resolver: zodResolver(TrainingLocationSchema),
+    defaultValues: {
+      state: "",
+      district: "",
+      isActive: true,
+    },
+  })
+
+  const stackForm = useForm({
+    resolver: zodResolver(StackSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+    },
+  })
+
+  // Fetch functions
   const fetchCategories = useCallback(async () => {
     try {
-      setLoading(true)
+      setCategoriesLoading(true)
       const params = new URLSearchParams({
-        search: searchTerm,
-        ...(isActiveFilter !== "ALL" && { isActive: isActiveFilter === "true" }),
+        search: categorySearchTerm,
+        ...(categoryActiveFilter !== "ALL" && { isActive: categoryActiveFilter === "true" }),
       })
       
       const response = await fetch(`/api/training-categories?${params}`)
@@ -85,9 +140,52 @@ export default function AdminTrainingsPage() {
       console.error('Error fetching training categories:', error)
       toast.error('Failed to load training categories')
     } finally {
-      setLoading(false)
+      setCategoriesLoading(false)
     }
-  }, [searchTerm, isActiveFilter])
+  }, [categorySearchTerm, categoryActiveFilter])
+
+  const fetchLocations = useCallback(async () => {
+    try {
+      setLocationsLoading(true)
+      const params = new URLSearchParams({
+        search: locationSearchTerm,
+        ...(locationActiveFilter !== "ALL" && { isActive: locationActiveFilter === "true" }),
+      })
+      
+      const response = await fetch(`/api/training-locations?${params}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch training locations')
+      }
+      const data = await response.json()
+      setLocations(data)
+    } catch (error) {
+      console.error('Error fetching training locations:', error)
+      toast.error('Failed to load training locations')
+    } finally {
+      setLocationsLoading(false)
+    }
+  }, [locationSearchTerm, locationActiveFilter])
+
+  const fetchStacks = useCallback(async () => {
+    try {
+      setStacksLoading(true)
+      const params = new URLSearchParams({
+        search: stackSearchTerm,
+      })
+      
+      const response = await fetch(`/api/stacks?${params}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch stacks')
+      }
+      const data = await response.json()
+      setStacks(data)
+    } catch (error) {
+      console.error('Error fetching stacks:', error)
+      toast.error('Failed to load stacks')
+    } finally {
+      setStacksLoading(false)
+    }
+  }, [stackSearchTerm])
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -104,70 +202,193 @@ export default function AdminTrainingsPage() {
   useEffect(() => {
     if (status === "authenticated" && session?.user?.role === "ADMIN") {
       fetchCategories()
+      fetchLocations()
+      fetchStacks()
     }
-  }, [status, session, fetchCategories])
+  }, [status, session, fetchCategories, fetchLocations, fetchStacks])
 
-  // Reset form when dialog is closed
+  // Reset forms when dialogs are closed
   useEffect(() => {
-    if (!isDialogOpen) {
+    if (!isCategoryDialogOpen) {
       setEditingCategory(null)
-      form.reset()
+      categoryForm.reset()
     }
-  }, [isDialogOpen, form])
+  }, [isCategoryDialogOpen, categoryForm])
 
+  useEffect(() => {
+    if (!isLocationDialogOpen) {
+      setEditingLocation(null)
+      locationForm.reset()
+    }
+  }, [isLocationDialogOpen, locationForm])
+
+  useEffect(() => {
+    if (!isStackDialogOpen) {
+      setEditingStack(null)
+      stackForm.reset()
+    }
+  }, [isStackDialogOpen, stackForm])
+
+  // Filter functions
   const filteredCategories = useMemo(() => {
     return categories.filter(category =>
-      category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      category.description.toLowerCase().includes(searchTerm.toLowerCase())
+      category.name.toLowerCase().includes(categorySearchTerm.toLowerCase()) ||
+      category.description.toLowerCase().includes(categorySearchTerm.toLowerCase())
     )
-  }, [categories, searchTerm])
+  }, [categories, categorySearchTerm])
 
-  const handleEdit = (category: TrainingCategory) => {
+  const filteredLocations = useMemo(() => {
+    return locations.filter(location =>
+      location.state.toLowerCase().includes(locationSearchTerm.toLowerCase()) ||
+      location.district.toLowerCase().includes(locationSearchTerm.toLowerCase())
+    )
+  }, [locations, locationSearchTerm])
+
+  const filteredStacks = useMemo(() => {
+    return stacks.filter(stack =>
+      stack.name.toLowerCase().includes(stackSearchTerm.toLowerCase()) ||
+      (stack.description && stack.description.toLowerCase().includes(stackSearchTerm.toLowerCase()))
+    )
+  }, [stacks, stackSearchTerm])
+
+  // Edit handlers
+  const handleEditCategory = (category: TrainingCategory) => {
     setEditingCategory(category)
-    form.reset({
+    categoryForm.reset({
       name: category.name,
       description: category.description,
       isActive: category.isActive,
     })
-    setIsDialogOpen(true)
+    setIsCategoryDialogOpen(true)
   }
 
-  const handleSave = form.handleSubmit(async (data) => {
-  startTransition(async () => {
-    try {
-      const url = editingCategory ? '/api/training-categories' : '/api/training-categories'
-      const method = editingCategory ? 'PUT' : 'POST'
-      const body = {
-        ...(editingCategory && { id: editingCategory.id }),
-        ...data,
+  const handleEditLocation = (location: TrainingLocation) => {
+    setEditingLocation(location)
+    locationForm.reset({
+      state: location.state,
+      district: location.district,
+      isActive: location.isActive,
+    })
+    setIsLocationDialogOpen(true)
+  }
+
+  const handleEditStack = (stack: Stack) => {
+    setEditingStack(stack)
+    stackForm.reset({
+      name: stack.name,
+      description: stack.description || "",
+    })
+    setIsStackDialogOpen(true)
+  }
+
+  // Save handlers
+  const handleSaveCategory = categoryForm.handleSubmit(async (data) => {
+    startTransition(async () => {
+      try {
+        const url = editingCategory ? '/api/training-categories' : '/api/training-categories'
+        const method = editingCategory ? 'PUT' : 'POST'
+        const body = {
+          ...(editingCategory && { id: editingCategory.id }),
+          ...data,
+        }
+
+        const response = await fetch(url, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to save category')
+        }
+
+        toast.success(`Training category ${editingCategory ? 'updated' : 'created'} successfully`)
+        setIsCategoryDialogOpen(false)
+        setEditingCategory(null)
+        categoryForm.reset()
+        fetchCategories()
+      } catch (error) {
+        console.error('Error saving category:', error)
+        toast.error(error instanceof Error ? error.message : 'Failed to save category')
       }
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to save category')
-      }
-
-      toast.success(`Training category ${editingCategory ? 'updated' : 'created'} successfully`)
-      setIsDialogOpen(false)
-      setEditingCategory(null)
-      form.reset()
-      fetchCategories()
-    } catch (error) {
-      console.error('Error saving category:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to save category')
-    }
+    })
   })
-})
 
-  const handleDelete = async (categoryId: string) => {
+  const handleSaveLocation = locationForm.handleSubmit(async (data) => {
+    startTransition(async () => {
+      try {
+        const url = editingLocation ? '/api/training-locations' : '/api/training-locations'
+        const method = editingLocation ? 'PUT' : 'POST'
+        const body = {
+          ...(editingLocation && { id: editingLocation.id }),
+          ...data,
+        }
+
+        const response = await fetch(url, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to save location')
+        }
+
+        toast.success(`Training location ${editingLocation ? 'updated' : 'created'} successfully`)
+        setIsLocationDialogOpen(false)
+        setEditingLocation(null)
+        locationForm.reset()
+        fetchLocations()
+      } catch (error) {
+        console.error('Error saving location:', error)
+        toast.error(error instanceof Error ? error.message : 'Failed to save location')
+      }
+    })
+  })
+
+  const handleSaveStack = stackForm.handleSubmit(async (data) => {
+    startTransition(async () => {
+      try {
+        const url = editingStack ? '/api/stacks' : '/api/stacks'
+        const method = editingStack ? 'PUT' : 'POST'
+        const body = {
+          ...(editingStack && { id: editingStack.id }),
+          ...data,
+        }
+
+        const response = await fetch(url, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to save stack')
+        }
+
+        toast.success(`Stack ${editingStack ? 'updated' : 'created'} successfully`)
+        setIsStackDialogOpen(false)
+        setEditingStack(null)
+        stackForm.reset()
+        fetchStacks()
+      } catch (error) {
+        console.error('Error saving stack:', error)
+        toast.error(error instanceof Error ? error.message : 'Failed to save stack')
+      }
+    })
+  })
+
+  // Delete handlers
+  const handleDeleteCategory = async (categoryId: string) => {
     try {
       const response = await fetch(`/api/training-categories?id=${categoryId}`, {
         method: 'DELETE',
@@ -186,103 +407,45 @@ export default function AdminTrainingsPage() {
     }
   }
 
-  const handleExportCSV = useCallback(() => {
-    if (selectedCategories.length === 0) {
-      toast.error("Please select categories to export")
-      return
-    }
-
-    const categoriesToExport = categories.filter(cat => selectedCategories.includes(cat.id))
-    
-    // Create CSV content
-    const headers = ["Category Name", "Description", "Status", "Total Trainings", "Active Trainings", "Created Date"]
-    const csvContent = [
-      headers.join(","),
-      ...categoriesToExport.map(cat => [
-        cat.name,
-        cat.description,
-        cat.isActive ? "Active" : "Inactive",
-        cat.trainingsCount,
-        cat.activeTrainingsCount,
-        new Date(cat.createdAt).toLocaleDateString()
-      ].join(","))
-    ].join("\n")
-
-    // Create and download file
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const link = document.createElement("a")
-    const url = URL.createObjectURL(blob)
-    link.setAttribute("href", url)
-    link.setAttribute("download", `training-categories_${new Date().toISOString().split('T')[0]}.csv`)
-    link.style.visibility = "hidden"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    
-    toast.success(`Exported ${categoriesToExport.length} categories to CSV`)
-  }, [selectedCategories, categories])
-
-  const handleImportCSV = async () => {
-    if (!importFile) {
-      toast.error("Please select a CSV file to import")
-      return
-    }
-
+  const handleDeleteLocation = async (locationId: string) => {
     try {
-      const text = await importFile.text()
-      const lines = text.split('\n')
-      
-      if (lines.length < 2) {
-        toast.error("CSV file must contain at least a header row and one data row")
-        return
-      }
-
-      // Parse CSV (simple implementation)
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
-      const categoriesToImport = []
-      
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim())
-        if (values.length >= 2) {
-          const category: any = {
-            name: values[headers.indexOf('name')] || values[0],
-            description: values[headers.indexOf('description')] || values[1],
-            isActive: (values[headers.indexOf('isactive')] || values[2] || 'true').toLowerCase() === 'true'
-          }
-          categoriesToImport.push(category)
-        }
-      }
-
-      if (categoriesToImport.length === 0) {
-        toast.error("No valid categories found in CSV file")
-        return
-      }
-
-      // Import categories
-      const response = await fetch('/api/training-categories/bulk-import', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ categories: categoriesToImport }),
+      const response = await fetch(`/api/training-locations?id=${locationId}`, {
+        method: 'DELETE',
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to import categories')
+        throw new Error(errorData.error || 'Failed to delete location')
       }
 
-      const result = await response.json()
-      toast.success(`Successfully imported ${result.importedCount} categories. ${result.skippedCount} skipped.`)
-      setIsImportDialogOpen(false)
-      setImportFile(null)
-      fetchCategories()
+      toast.success('Training location deleted successfully')
+      fetchLocations()
     } catch (error) {
-      console.error('Error importing CSV:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to import CSV')
+      console.error('Error deleting location:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to delete location')
     }
   }
 
+  const handleDeleteStack = async (stackId: string) => {
+    try {
+      const response = await fetch(`/api/stacks?id=${stackId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete stack')
+      }
+
+      toast.success('Stack deleted successfully')
+      fetchStacks()
+    } catch (error) {
+      console.error('Error deleting stack:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to delete stack')
+    }
+  }
+
+  // Select handlers
   const handleSelectCategory = (categoryId: string, checked: boolean) => {
     if (checked) {
       setSelectedCategories(prev => [...prev, categoryId])
@@ -291,8 +454,24 @@ export default function AdminTrainingsPage() {
     }
   }
 
-  const handleSelectAll = (checked: boolean) => {
-    setIsSelectAll(checked)
+  const handleSelectLocation = (locationId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedLocations(prev => [...prev, locationId])
+    } else {
+      setSelectedLocations(prev => prev.filter(id => id !== location))
+    }
+  }
+
+  const handleSelectStack = (stackId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedStacks(prev => [...prev, stackId])
+    } else {
+      setSelectedStacks(prev => prev.filter(id => id !== stack))
+    }
+  }
+
+  const handleSelectAllCategories = (checked: boolean) => {
+    setIsCategorySelectAll(checked)
     if (checked) {
       setSelectedCategories(filteredCategories.map(cat => cat.id))
     } else {
@@ -300,31 +479,21 @@ export default function AdminTrainingsPage() {
     }
   }
 
-  const handleBulkDelete = async () => {
-    if (selectedCategories.length === 0) {
-      toast.error("Please select categories to delete")
-      return
+  const handleSelectAllLocations = (checked: boolean) => {
+    setIsLocationSelectAll(checked)
+    if (checked) {
+      setSelectedLocations(filteredLocations.map(loc => loc.id))
+    } else {
+      setSelectedLocations([])
     }
+  }
 
-    try {
-      const deletePromises = selectedCategories.map(id => 
-        fetch(`/api/training-categories?id=${id}`, { method: 'DELETE' })
-      )
-      
-      const responses = await Promise.all(deletePromises)
-      const failedDeletes = responses.filter(response => !response.ok)
-      
-      if (failedDeletes.length > 0) {
-        toast.error(`Failed to delete ${failedDeletes.length} categories`)
-      } else {
-        toast.success(`Successfully deleted ${selectedCategories.length} categories`)
-        setSelectedCategories([])
-        setIsSelectAll(false)
-        fetchCategories()
-      }
-    } catch (error) {
-      console.error('Error in bulk delete:', error)
-      toast.error('Failed to delete categories')
+  const handleSelectAllStacks = (checked: boolean) => {
+    setIsStackSelectAll(checked)
+    if (checked) {
+      setSelectedStacks(filteredStacks.map(stack => stack.id))
+    } else {
+      setSelectedStacks([])
     }
   }
 
@@ -344,386 +513,712 @@ export default function AdminTrainingsPage() {
   return (
     <DashboardLayout userRole={user.role} userName={user.name || "Admin"}>
       <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Training Management</h1>
-          <p className="text-muted-foreground">Manage training categories, types, and locations</p>
+        {/* Page Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Training Management</h1>
+            <p className="text-muted-foreground">Manage training categories, locations, and stacks</p>
+          </div>
         </div>
-        <div className="flex gap-2">
-          {selectedCategories.length > 0 && (
-            <>
-              <Button variant="outline" onClick={handleBulkDelete} className="text-red-600">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete ({selectedCategories.length})
-              </Button>
-              <Badge variant="secondary">
-                {selectedCategories.length} selected
-              </Badge>
-            </>
-          )}
-          <Button variant="outline" onClick={handleExportCSV}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
-          <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Upload className="h-4 w-4 mr-2" />
-                Import CSV
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Import Categories</DialogTitle>
-                <DialogDescription>
-                  Upload a CSV file to import training categories in bulk.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="csvFile">CSV File</Label>
-                  <Input
-                    id="csvFile"
-                    type="file"
-                    accept=".csv"
-                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    CSV format: name, description, isActive (optional)
-                  </p>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Total Categories</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {categoriesLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-2xl font-bold">{categories.length}</div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Total Locations</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {locationsLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-2xl font-bold">{locations.length}</div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Total Stacks</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {stacksLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-2xl font-bold">{stacks.length}</div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Total Trainings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {categoriesLoading || locationsLoading || stacksLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-2xl font-bold">
+                  {categories.reduce((sum, cat) => sum + cat.trainingsCount, 0)}
                 </div>
-                {importFile && (
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-sm font-medium">Selected file: {importFile.name}</p>
-                    <p className="text-xs text-muted-foreground">Size: {(importFile.size / 1024).toFixed(2)} KB</p>
-                  </div>
-                )}
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleImportCSV} disabled={!importFile || isPending}>
-                  {isPending ? "Importing..." : "Import"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Category
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingCategory ? "Edit Category" : "Add New Category"}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingCategory 
-                    ? "Update the training category information."
-                    : "Create a new training category for the platform."
-                  }
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={handleSave} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Name</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="e.g., FRAMEWORKS" 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Describe this training category..." 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="isActive"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                        <div className="space-y-0.5">
-                          <FormLabel>Active</FormLabel>
-                          <FormDescription>
-                            Enable this category to be visible in the platform
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <DialogFooter>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => {
-                        setIsDialogOpen(false)
-                        setEditingCategory(null)
-                        form.reset()
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={isPending}>
-                      {isPending ? "Saving..." : (editingCategory ? "Update" : "Save")}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+              )}
+            </CardContent>
+          </Card>
         </div>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Categories</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <div className="text-2xl font-bold">{categories.length}</div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Active Categories</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <div className="text-2xl font-bold">{categories.filter(c => c.isActive).length}</div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Trainings</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <div className="text-2xl font-bold">{categories.reduce((sum, cat) => sum + cat.trainingsCount, 0)}</div>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Most Popular</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <div className="text-2xl font-bold">
-                {categories.length > 0 ? categories.reduce((max, cat) => cat.trainingsCount > max.trainingsCount ? cat : max, categories[0])?.name || 'N/A' : 'N/A'}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+        {/* Tabs */}
+        <Tabs defaultValue="categories" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="categories" className="flex items-center gap-2">
+              <FolderOpen className="h-4 w-4" />
+              Categories
+            </TabsTrigger>
+            <TabsTrigger value="locations" className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              Locations
+            </TabsTrigger>
+            <TabsTrigger value="stacks" className="flex items-center gap-2">
+              <Grid3X3 className="h-4 w-4" />
+              Stacks
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Search */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Training Categories</CardTitle>
-          <CardDescription>Manage training categories and their configurations</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search categories..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={isActiveFilter} onValueChange={setIsActiveFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Status</SelectItem>
-                <SelectItem value="true">Active</SelectItem>
-                <SelectItem value="false">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[50px]">
-                    <Checkbox
-                      checked={isSelectAll}
-                      onCheckedChange={handleSelectAll}
-                      aria-label="Select all categories"
-                    />
-                  </TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Total Trainings</TableHead>
-                  <TableHead>Active Trainings</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, index) => (
-                    <TableRow key={index}>
-                      <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-8" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-8" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  filteredCategories.map((category) => (
-                    <TableRow key={category.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedCategories.includes(category.id)}
-                          onCheckedChange={(checked) => handleSelectCategory(category.id, checked as boolean)}
-                          aria-label={`Select ${category.name}`}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">{category.name}</TableCell>
-                      <TableCell className="max-w-xs truncate">{category.description}</TableCell>
-                      <TableCell>{category.trainingsCount}</TableCell>
-                      <TableCell>{category.activeTrainingsCount}</TableCell>
-                      <TableCell>
-                        <Badge variant={category.isActive ? "default" : "secondary"}>
-                          {category.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEdit(category)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleDelete(category.id)}
-                              className="text-red-600"
+          {/* Categories Tab */}
+          <TabsContent value="categories" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Training Categories</CardTitle>
+                    <CardDescription>Manage training categories for the platform</CardDescription>
+                  </div>
+                  <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Category
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingCategory ? "Edit Category" : "Add New Category"}
+                        </DialogTitle>
+                        <DialogDescription>
+                          {editingCategory 
+                            ? "Update the training category information."
+                            : "Create a new training category for the platform."
+                          }
+                        </DialogDescription>
+                      </DialogHeader>
+                      <Form {...categoryForm}>
+                        <form onSubmit={handleSaveCategory} className="space-y-4">
+                          <FormField
+                            control={categoryForm.control}
+                            name="name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Name</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="e.g., FRAMEWORKS" 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={categoryForm.control}
+                            name="description"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Description</FormLabel>
+                                <FormControl>
+                                  <Textarea 
+                                    placeholder="Describe this training category..." 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={categoryForm.control}
+                            name="isActive"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                <div className="space-y-0.5">
+                                  <FormLabel>Active</FormLabel>
+                                  <FormDescription>
+                                    Enable this category to be visible in the platform
+                                  </FormDescription>
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <DialogFooter>
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              onClick={() => {
+                                setIsCategoryDialogOpen(false)
+                                setEditingCategory(null)
+                                categoryForm.reset()
+                              }}
                             >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          
-          {!loading && filteredCategories.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              No training categories found matching your filters.
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                              Cancel
+                            </Button>
+                            <Button type="submit" disabled={isPending}>
+                              {isPending ? "Saving..." : (editingCategory ? "Update" : "Save")}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </Form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Search and Filter */}
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-1">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search categories..."
+                          value={categorySearchTerm}
+                          onChange={(e) => setCategorySearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                    <Select value={categoryActiveFilter} onValueChange={setCategoryActiveFilter}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All Status</SelectItem>
+                        <SelectItem value="true">Active</SelectItem>
+                        <SelectItem value="false">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-      {/* Additional Management Sections */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Training Types
-            </CardTitle>
-            <CardDescription>Manage available training types</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center p-2 border rounded">
-                <span>CORPORATE</span>
-                <Badge variant="outline">Active</Badge>
-              </div>
-              <div className="flex justify-between items-center p-2 border rounded">
-                <span>UNIVERSITY</span>
-                <Badge variant="outline">Active</Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                  {/* Categories Table */}
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]">
+                            <Checkbox
+                              checked={isCategorySelectAll}
+                              onCheckedChange={handleSelectAllCategories}
+                              aria-label="Select all categories"
+                            />
+                          </TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Trainings</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead className="w-[100px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {categoriesLoading ? (
+                          Array.from({ length: 5 }).map((_, index) => (
+                            <TableRow key={index}>
+                              <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            </TableRow>
+                          ))
+                        ) : filteredCategories.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                              No categories found matching your search.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredCategories.map((category) => (
+                            <TableRow key={category.id}>
+                              <TableCell>
+                                <Checkbox
+                                  checked={selectedCategories.includes(category.id)}
+                                  onCheckedChange={(checked) => handleSelectCategory(category.id, checked as boolean)}
+                                  aria-label={`Select category ${category.name}`}
+                                />
+                              </TableCell>
+                              <TableCell className="font-medium">{category.name}</TableCell>
+                              <TableCell className="max-w-xs truncate">{category.description}</TableCell>
+                              <TableCell>
+                                <Badge variant={category.isActive ? "default" : "secondary"}>
+                                  {category.isActive ? "Active" : "Inactive"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{category.trainingsCount}</TableCell>
+                              <TableCell>{new Date(category.createdAt).toLocaleDateString()}</TableCell>
+                              <TableCell>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleEditCategory(category)}>
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleDeleteCategory(category.id)}
+                                      className="text-red-600"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Quick Actions
-            </CardTitle>
-            <CardDescription>Common training management tasks</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <Button variant="outline" className="w-full justify-start">
-                Manage Training Locations
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                Manage Stacks & Frameworks
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                View Training Analytics
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Locations Tab */}
+          <TabsContent value="locations" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Training Locations</CardTitle>
+                    <CardDescription>Manage training locations (states and districts)</CardDescription>
+                  </div>
+                  <Dialog open={isLocationDialogOpen} onOpenChange={setIsLocationDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Location
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingLocation ? "Edit Location" : "Add New Location"}
+                        </DialogTitle>
+                        <DialogDescription>
+                          {editingLocation 
+                            ? "Update the training location information."
+                            : "Create a new training location for the platform."
+                          }
+                        </DialogDescription>
+                      </DialogHeader>
+                      <Form {...locationForm}>
+                        <form onSubmit={handleSaveLocation} className="space-y-4">
+                          <FormField
+                            control={locationForm.control}
+                            name="state"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>State</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="e.g., Karnataka" 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={locationForm.control}
+                            name="district"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>District</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="e.g., Bangalore" 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={locationForm.control}
+                            name="isActive"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                <div className="space-y-0.5">
+                                  <FormLabel>Active</FormLabel>
+                                  <FormDescription>
+                                    Enable this location to be visible in the platform
+                                  </FormDescription>
+                                </div>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <DialogFooter>
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              onClick={() => {
+                                setIsLocationDialogOpen(false)
+                                setEditingLocation(null)
+                                locationForm.reset()
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button type="submit" disabled={isPending}>
+                              {isPending ? "Saving..." : (editingLocation ? "Update" : "Save")}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </Form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Search and Filter */}
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-1">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search locations..."
+                          value={locationSearchTerm}
+                          onChange={(e) => setLocationSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                    <Select value={locationActiveFilter} onValueChange={setLocationActiveFilter}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All Status</SelectItem>
+                        <SelectItem value="true">Active</SelectItem>
+                        <SelectItem value="false">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Locations Table */}
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]">
+                            <Checkbox
+                              checked={isLocationSelectAll}
+                              onCheckedChange={handleSelectAllLocations}
+                              aria-label="Select all locations"
+                            />
+                          </TableHead>
+                          <TableHead>State</TableHead>
+                          <TableHead>District</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Trainings</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead className="w-[100px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {locationsLoading ? (
+                          Array.from({ length: 5 }).map((_, index) => (
+                            <TableRow key={index}>
+                              <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            </TableRow>
+                          ))
+                        ) : filteredLocations.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                              No locations found matching your search.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredLocations.map((location) => (
+                            <TableRow key={location.id}>
+                              <TableCell>
+                                <Checkbox
+                                  checked={selectedLocations.includes(location.id)}
+                                  onCheckedChange={(checked) => handleSelectLocation(location.id, checked as boolean)}
+                                  aria-label={`Select location ${location.state}, ${location.district}`}
+                                />
+                              </TableCell>
+                              <TableCell className="font-medium">{location.state}</TableCell>
+                              <TableCell>{location.district}</TableCell>
+                              <TableCell>
+                                <Badge variant={location.isActive ? "default" : "secondary"}>
+                                  {location.isActive ? "Active" : "Inactive"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{location.trainingsCount}</TableCell>
+                              <TableCell>{new Date(location.createdAt).toLocaleDateString()}</TableCell>
+                              <TableCell>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleEditLocation(location)}>
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleDeleteLocation(location.id)}
+                                      className="text-red-600"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Stacks Tab */}
+          <TabsContent value="stacks" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Stacks & Frameworks</CardTitle>
+                    <CardDescription>Manage technology stacks and frameworks</CardDescription>
+                  </div>
+                  <Dialog open={isStackDialogOpen} onOpenChange={setIsStackDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Stack
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingStack ? "Edit Stack" : "Add New Stack"}
+                        </DialogTitle>
+                        <DialogDescription>
+                          {editingStack 
+                            ? "Update the stack information."
+                            : "Create a new technology stack or framework."
+                          }
+                        </DialogDescription>
+                      </DialogHeader>
+                      <Form {...stackForm}>
+                        <form onSubmit={handleSaveStack} className="space-y-4">
+                          <FormField
+                            control={stackForm.control}
+                            name="name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Name</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="e.g., React.js" 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={stackForm.control}
+                            name="description"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Description</FormLabel>
+                                <FormControl>
+                                  <Textarea 
+                                    placeholder="Describe this technology stack..." 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <DialogFooter>
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              onClick={() => {
+                                setIsStackDialogOpen(false)
+                                setEditingStack(null)
+                                stackForm.reset()
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button type="submit" disabled={isPending}>
+                              {isPending ? "Saving..." : (editingStack ? "Update" : "Save")}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </Form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Search */}
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search stacks..."
+                        value={stackSearchTerm}
+                        onChange={(e) => setStackSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Stacks Table */}
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]">
+                            <Checkbox
+                              checked={isStackSelectAll}
+                              onCheckedChange={handleSelectAllStacks}
+                              aria-label="Select all stacks"
+                            />
+                          </TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Trainings</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead className="w-[100px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {stacksLoading ? (
+                          Array.from({ length: 5 }).map((_, index) => (
+                            <TableRow key={index}>
+                              <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            </TableRow>
+                          ))
+                        ) : filteredStacks.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                              No stacks found matching your search.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredStacks.map((stack) => (
+                            <TableRow key={stack.id}>
+                              <TableCell>
+                                <Checkbox
+                                  checked={selectedStacks.includes(stack.id)}
+                                  onCheckedChange={(checked) => handleSelectStack(stack.id, checked as boolean)}
+                                  aria-label={`Select stack ${stack.name}`}
+                                />
+                              </TableCell>
+                              <TableCell className="font-medium">{stack.name}</TableCell>
+                              <TableCell className="max-w-xs truncate">{stack.description}</TableCell>
+                              <TableCell>{stack.trainingsCount}</TableCell>
+                              <TableCell>{new Date(stack.createdAt).toLocaleDateString()}</TableCell>
+                              <TableCell>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleEditStack(stack)}>
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleDeleteStack(stack.id)}
+                                      className="text-red-600"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   )
