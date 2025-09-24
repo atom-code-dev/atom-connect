@@ -2,8 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
-import { useState } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,7 +12,33 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Search, Filter, Download, MoreHorizontal, Eye, Edit, Trash2, Building, CheckCircle, XCircle, Clock } from "lucide-react"
+import { toast } from "sonner"
+import { VerificationStatus, ActiveStatus } from "@prisma/client"
+
+interface OrganizationProfile {
+  id: string
+  organizationName: string
+  website?: string
+  contactMail: string
+  phone?: string
+  verifiedStatus: VerificationStatus
+  companyLocation: string
+  activeStatus: ActiveStatus
+  ratings: number
+  logo?: string
+  createdAt: string
+  updatedAt: string
+  user: {
+    id: string
+    email: string
+    name?: string
+  }
+  trainings: any[]
+  feedbacks: any[]
+}
 
 interface User {
   id: string
@@ -21,75 +46,6 @@ interface User {
   role: string
   name: string
 }
-
-// Dummy data for organizations
-const dummyOrganizations = [
-  {
-    id: "1",
-    name: "TechCorp Solutions",
-    email: "contact@techcorp.com",
-    website: "https://techcorp.com",
-    phone: "+91-9876543210",
-    location: "Bangalore, Karnataka",
-    verifiedStatus: "VERIFIED",
-    activeStatus: "ACTIVE",
-    ratings: 4.5,
-    trainingsCount: 12,
-    joinDate: "2024-01-15",
-  },
-  {
-    id: "2",
-    name: "Code Academy",
-    email: "info@codeacademy.com",
-    website: "https://codeacademy.com",
-    phone: "+91-9876543211",
-    location: "Mumbai, Maharashtra",
-    verifiedStatus: "PENDING",
-    activeStatus: "ACTIVE",
-    ratings: 4.2,
-    trainingsCount: 8,
-    joinDate: "2024-01-10",
-  },
-  {
-    id: "3",
-    name: "Leadership Institute",
-    email: "hello@leadership.edu",
-    website: "https://leadership.edu",
-    phone: "+91-9876543212",
-    location: "Delhi, Delhi",
-    verifiedStatus: "VERIFIED",
-    activeStatus: "ACTIVE",
-    ratings: 4.8,
-    trainingsCount: 15,
-    joinDate: "2024-01-08",
-  },
-  {
-    id: "4",
-    name: "DevWorks Inc.",
-    email: "contact@devworks.com",
-    website: "https://devworks.com",
-    phone: "+91-9876543213",
-    location: "Pune, Maharashtra",
-    verifiedStatus: "REJECTED",
-    activeStatus: "INACTIVE",
-    ratings: 3.5,
-    trainingsCount: 3,
-    joinDate: "2024-01-05",
-  },
-  {
-    id: "5",
-    name: "Data Science Hub",
-    email: "info@datasciencehub.com",
-    website: "https://datasciencehub.com",
-    phone: "+91-9876543214",
-    location: "Chennai, Tamil Nadu",
-    verifiedStatus: "VERIFIED",
-    activeStatus: "ACTIVE",
-    ratings: 4.6,
-    trainingsCount: 10,
-    joinDate: "2024-01-18",
-  },
-]
 
 const verificationStatusColors = {
   VERIFIED: "bg-green-100 text-green-800",
@@ -106,9 +62,38 @@ export default function AdminOrganizationsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
 
+  const [organizations, setOrganizations] = useState<OrganizationProfile[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [verificationFilter, setVerificationFilter] = useState("ALL")
   const [activeFilter, setActiveFilter] = useState("ALL")
+  const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>([])
+  const [isSelectAll, setIsSelectAll] = useState(false)
+
+  const fetchOrganizations = useCallback(async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams({
+        page: "1",
+        limit: "100",
+        search: searchTerm,
+        verificationStatus: verificationFilter === "ALL" ? "" : verificationFilter,
+        activeStatus: activeFilter === "ALL" ? "" : activeFilter,
+      })
+      
+      const response = await fetch(`/api/organizations?${params}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch organizations')
+      }
+      const data = await response.json()
+      setOrganizations(data.organizations || [])
+    } catch (error) {
+      console.error('Error fetching organizations:', error)
+      toast.error('Failed to load organizations')
+    } finally {
+      setLoading(false)
+    }
+  }, [searchTerm, verificationFilter, activeFilter])
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -122,7 +107,64 @@ export default function AdminOrganizationsPage() {
     }
   }, [status, session, router])
 
-  if (status === "loading") {
+  useEffect(() => {
+    if (status === "authenticated" && session?.user?.role === "ADMIN") {
+      fetchOrganizations()
+    }
+  }, [status, session, fetchOrganizations])
+
+  const handleExportCSV = useCallback(() => {
+    if (selectedOrganizations.length === 0) {
+      toast.error("Please select organizations to export")
+      return
+    }
+
+    const organizationsToExport = organizations.filter(org => selectedOrganizations.includes(org.id))
+    
+    // Create CSV content
+    const headers = ["Organization Name", "Email", "Website", "Location", "Verification Status", "Active Status", "Rating", "Join Date"]
+    const csvContent = [
+      headers.join(","),
+      ...organizationsToExport.map(org => [
+        org.organizationName,
+        org.contactMail,
+        org.website || '',
+        org.companyLocation,
+        org.verifiedStatus,
+        org.activeStatus,
+        org.ratings,
+        new Date(org.createdAt).toLocaleDateString()
+      ].join(","))
+    ].join("\n")
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `organizations_${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    toast.success(`Exported ${organizationsToExport.length} organizations to CSV`)
+  }, [selectedOrganizations, organizations])
+
+  const filteredOrganizations = useMemo(() => {
+    return organizations.filter(org => {
+      const matchesSearch = searchTerm === "" || 
+                           org.organizationName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           org.contactMail.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           org.companyLocation.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesVerification = verificationFilter === "ALL" || org.verifiedStatus === verificationFilter
+      const matchesActive = activeFilter === "ALL" || org.activeStatus === activeFilter
+      
+      return matchesSearch && matchesVerification && matchesActive
+    })
+  }, [organizations, searchTerm, verificationFilter, activeFilter])
+
+  if (status === "loading" || !session || session.user.role !== "ADMIN") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -133,25 +175,23 @@ export default function AdminOrganizationsPage() {
     )
   }
 
-  if (!session || session.user.role !== "ADMIN") {
-    return null
-  }
-
   const user = session.user
 
-  const filteredOrganizations = dummyOrganizations.filter(org => {
-    const matchesSearch = org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         org.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         org.location.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesVerification = verificationFilter === "ALL" || org.verifiedStatus === verificationFilter
-    const matchesActive = activeFilter === "ALL" || org.activeStatus === activeFilter
-    
-    return matchesSearch && matchesVerification && matchesActive
-  })
+  const handleSelectOrganization = (orgId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedOrganizations(prev => [...prev, orgId])
+    } else {
+      setSelectedOrganizations(prev => prev.filter(id => id !== orgId))
+    }
+  }
 
-  const handleExportCSV = () => {
-    // CSV export logic would go here
-    console.log("Exporting organizations to CSV...")
+  const handleSelectAll = (checked: boolean) => {
+    setIsSelectAll(checked)
+    if (checked) {
+      setSelectedOrganizations(filteredOrganizations.map(org => org.id))
+    } else {
+      setSelectedOrganizations([])
+    }
   }
 
   return (
@@ -164,6 +204,11 @@ export default function AdminOrganizationsPage() {
           <p className="text-muted-foreground">Manage all organizations in the system</p>
         </div>
         <div className="flex gap-2">
+          {selectedOrganizations.length > 0 && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              {selectedOrganizations.length} selected
+            </Badge>
+          )}
           <Button variant="outline" onClick={handleExportCSV}>
             <Download className="h-4 w-4 mr-2" />
             Export CSV
@@ -179,7 +224,11 @@ export default function AdminOrganizationsPage() {
             <CardTitle className="text-sm font-medium">Total Organizations</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dummyOrganizations.length}</div>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold">{organizations.length}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -187,7 +236,11 @@ export default function AdminOrganizationsPage() {
             <CardTitle className="text-sm font-medium">Verified</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dummyOrganizations.filter(o => o.verifiedStatus === "VERIFIED").length}</div>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold">{organizations.filter(o => o.verifiedStatus === 'VERIFIED').length}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -195,7 +248,11 @@ export default function AdminOrganizationsPage() {
             <CardTitle className="text-sm font-medium">Pending Verification</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dummyOrganizations.filter(o => o.verifiedStatus === "PENDING").length}</div>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold">{organizations.filter(o => o.verifiedStatus === 'PENDING').length}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -203,7 +260,11 @@ export default function AdminOrganizationsPage() {
             <CardTitle className="text-sm font-medium">Active Trainings</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dummyOrganizations.reduce((sum, org) => sum + org.trainingsCount, 0)}</div>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold">{organizations.reduce((sum, org) => sum + org.trainings.length, 0)}</div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -262,6 +323,13 @@ export default function AdminOrganizationsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={isSelectAll}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all organizations"
+                    />
+                  </TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Location</TableHead>
@@ -273,84 +341,113 @@ export default function AdminOrganizationsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredOrganizations.map((org) => (
-                  <TableRow key={org.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <Building className="h-4 w-4" />
-                        {org.name}
-                      </div>
-                    </TableCell>
-                    <TableCell>{org.email}</TableCell>
-                    <TableCell>{org.location}</TableCell>
-                    <TableCell>
-                      <Badge className={verificationStatusColors[org.verifiedStatus]}>
-                        {org.verifiedStatus}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={activeStatusColors[org.activeStatus]}>
-                        {org.activeStatus}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <span>⭐</span>
-                        <span>{org.ratings}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{org.trainingsCount}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit Organization
-                          </DropdownMenuItem>
-                          {org.verifiedStatus === "PENDING" && (
-                            <>
-                              <DropdownMenuItem>
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                Approve
-                              </DropdownMenuItem>
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={index}>
+                      <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-8" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-8" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  filteredOrganizations.map((org) => (
+                    <TableRow key={org.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedOrganizations.includes(org.id)}
+                          onCheckedChange={(checked) => handleSelectOrganization(org.id, checked as boolean)}
+                          aria-label={`Select ${org.organizationName}`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4" />
+                          {org.organizationName}
+                        </div>
+                      </TableCell>
+                      <TableCell>{org.contactMail}</TableCell>
+                      <TableCell>{org.companyLocation}</TableCell>
+                      <TableCell>
+                        <Badge className={verificationStatusColors[org.verifiedStatus]}>
+                          {org.verifiedStatus}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={activeStatusColors[org.activeStatus]}>
+                          {org.activeStatus}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <span>⭐</span>
+                          <span>{org.ratings}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{org.trainings.length}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit Organization
+                            </DropdownMenuItem>
+                            {org.verifiedStatus === "PENDING" && (
+                              <>
+                                <DropdownMenuItem>
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Approve
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Reject
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {org.activeStatus === "ACTIVE" ? (
                               <DropdownMenuItem>
                                 <XCircle className="h-4 w-4 mr-2" />
-                                Reject
+                                Deactivate
                               </DropdownMenuItem>
-                            </>
-                          )}
-                          {org.activeStatus === "ACTIVE" ? (
-                            <DropdownMenuItem>
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Deactivate
+                            ) : (
+                              <DropdownMenuItem>
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Activate
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem className="text-red-600">
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
                             </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Activate
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem className="text-red-600">
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
+          
+          {!loading && filteredOrganizations.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              No organizations found matching your filters.
+            </div>
+          )}
         </CardContent>
       </Card>
 
