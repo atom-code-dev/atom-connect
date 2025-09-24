@@ -13,9 +13,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Search, Filter, Download, MoreHorizontal, Eye, Edit, Trash2, UserCheck, UserX } from "lucide-react"
+import { Search, Filter, Download, MoreHorizontal, Eye, Edit, Trash2, UserCheck, UserX, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { UserRole } from "@prisma/client"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { useForm, Controller } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { UserSchema } from "@/schema"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 
 interface User {
   id: string
@@ -84,6 +90,19 @@ export default function AdminUsersPage() {
   const [statusFilter, setStatusFilter] = useState("ALL")
   const [selectedUsers, setSelectedUsers] = useState<string[]>([])
   const [isSelectAll, setIsSelectAll] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+  // Form setup for adding user
+  const form = useForm({
+    resolver: zodResolver(UserSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      name: "",
+      phone: "",
+      role: "FREELANCER" as UserRole,
+    },
+  })
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -126,18 +145,19 @@ export default function AdminUsersPage() {
 
     const usersToExport = users.filter(user => selectedUsers.includes(user.id))
     
-    // Create CSV content
+    // Create CSV content with proper escaping for commas and quotes
     const headers = ["Name", "Email", "Role", "Status", "Join Date", "Last Login", "Profile Completed"]
     const csvContent = [
       headers.join(","),
       ...usersToExport.map(user => [
-        user.name || user.freelancerProfile?.name || user.organizationProfile?.organizationName || '',
-        user.email,
+        // Escape quotes and wrap in quotes if contains comma
+        `"${(user.name || user.freelancerProfile?.name || user.organizationProfile?.organizationName || '').replace(/"/g, '""')}"`,
+        `"${user.email.replace(/"/g, '""')}"`,
         user.role,
-        user.organizationProfile?.activeStatus || user.freelancerProfile?.availability || 'ACTIVE',
-        new Date(user.createdAt).toLocaleDateString(),
-        new Date(user.updatedAt).toLocaleDateString(),
-        (user.freelancerProfile || user.organizationProfile) ? "Yes" : "No"
+        `"${(user.organizationProfile?.activeStatus || user.freelancerProfile?.availability || 'ACTIVE').replace(/"/g, '""')}"`,
+        `"${new Date(user.createdAt).toLocaleDateString()}"`,
+        `"${new Date(user.updatedAt).toLocaleDateString()}"`,
+        `"${(user.freelancerProfile || user.organizationProfile) ? "Yes" : "No"}"`
       ].join(","))
     ].join("\n")
 
@@ -260,6 +280,31 @@ export default function AdminUsersPage() {
     return !!(user.freelancerProfile || user.organizationProfile || user.adminProfile || user.maintainerProfile)
   }
 
+  const handleAddUser = form.handleSubmit(async (data) => {
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create user')
+      }
+
+      toast.success('User created successfully')
+      setIsDialogOpen(false)
+      form.reset()
+      fetchUsers()
+    } catch (error) {
+      console.error('Error creating user:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to create user')
+    }
+  })
+
   return (
     <DashboardLayout userRole={user.role} userName={user.name || "Admin"}>
       <div className="space-y-6">
@@ -291,7 +336,126 @@ export default function AdminUsersPage() {
               <Download className="h-4 w-4 mr-2" />
               Export CSV
             </Button>
-            <Button>Add User</Button>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add User
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Add New User</DialogTitle>
+                  <DialogDescription>
+                    Create a new user account in the system.
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                  <form onSubmit={handleAddUser} className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="email" 
+                              placeholder="user@example.com" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="password" 
+                              placeholder="••••••••" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Password must be at least 6 characters long.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Name</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="John Doe" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="+1 234 567 8900" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="role"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Role</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a role" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="FREELANCER">Freelancer</SelectItem>
+                              <SelectItem value="ORGANIZATION">Organization</SelectItem>
+                              <SelectItem value="ADMIN">Admin</SelectItem>
+                              <SelectItem value="MAINTAINER">Maintainer</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="submit">
+                        Create User
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 

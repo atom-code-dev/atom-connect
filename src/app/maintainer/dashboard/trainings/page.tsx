@@ -18,36 +18,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Search, Filter, CheckCircle, XCircle, Clock, Eye, Edit, Trash2, BookOpen, MapPin, DollarSign, Users, Calendar } from "lucide-react"
 import { format } from "date-fns"
 
-export default function MaintainerTrainingsPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
-
-  useEffect(() => {
-    if (status === "loading") return
-    
-    if (!session) {
-      router.push("/")
-      return
-    }
-    
-    if (session.user?.role !== "MAINTAINER") {
-      router.push("/")
-      return
-    }
-  }, [session, status, router])
-
-  if (status === "loading") {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
-
-  if (!session) {
-    return null
-  }
-
 // Dummy data for maintainer trainings
 const dummyTrainings = [
   {
