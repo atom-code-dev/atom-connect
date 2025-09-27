@@ -103,7 +103,7 @@ export default function LoginPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4"
+      className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4"
     >
       {/* Theme toggle in top right corner */}
       <div className="absolute top-4 right-4">
@@ -118,7 +118,7 @@ export default function LoginPage() {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="text-center mb-8"
         >
-          <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <Users className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Atom Connect</h1>
