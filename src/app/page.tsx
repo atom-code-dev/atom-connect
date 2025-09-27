@@ -13,6 +13,7 @@ import { Eye, EyeOff, Users } from "lucide-react"
 import { toast } from "sonner"
 import { motion } from "framer-motion"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
+import { ResetPasswordDialog } from "@/components/auth/ResetPasswordDialog"
 
 export default function LoginPage() {
   const { data: session, status } = useSession()
@@ -197,6 +198,14 @@ export default function LoginPage() {
                 >
                   {isPending ? "Signing in..." : "Sign In"}
                 </Button>
+
+                <div className="text-center">
+                  <ResetPasswordDialog>
+                    <Button variant="link" className="text-sm h-auto p-0">
+                      Forgot your password?
+                    </Button>
+                  </ResetPasswordDialog>
+                </div>
               </form>
             </CardContent>
           </Card>

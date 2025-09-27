@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Separator } from "@/components/ui/separator"
 import { LogOut, Home, Settings, Key, User } from "lucide-react"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
+import { ResetPasswordDialog } from "@/components/auth/ResetPasswordDialog"
 import Link from "next/link"
 
 interface TopbarProps {
@@ -88,10 +89,12 @@ export function Topbar({ userRole, userName }: TopbarProps) {
                 <User className="h-4 w-4" />
                 Account Settings
               </Button>
-              <Button variant="ghost" className="w-full justify-start gap-2 h-8">
-                <Key className="h-4 w-4" />
-                Reset Password
-              </Button>
+              <ResetPasswordDialog>
+                <Button variant="ghost" className="w-full justify-start gap-2 h-8">
+                  <Key className="h-4 w-4" />
+                  Reset Password
+                </Button>
+              </ResetPasswordDialog>
               <Separator className="my-1" />
               <Button 
                 variant="ghost" 
