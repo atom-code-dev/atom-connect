@@ -147,7 +147,6 @@ export function DashboardLayout({ children, userRole, userName }: DashboardLayou
       <Topbar 
         userRole={userRole}
         userName={userName}
-        showBackButton={!isDashboardPage}
       />
       
       <div className="flex flex-1 overflow-hidden pt-16"> {/* Added padding-top for fixed topbar */}
