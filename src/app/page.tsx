@@ -103,7 +103,7 @@ export default function LoginPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4"
+      className="min-h-screen bg-background flex items-center justify-center p-4"
     >
       {/* Theme toggle in top right corner */}
       <div className="absolute top-4 right-4 z-50">
@@ -123,8 +123,8 @@ export default function LoginPage() {
           <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <Users className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Atom Connect</h1>
-          <p className="text-gray-600 mt-2">Trainer & Organization Connect</p>
+          <h1 className="text-2xl font-bold text-foreground">Atom Connect</h1>
+          <p className="text-muted-foreground mt-2">Trainer & Organization Connect</p>
         </motion.div>
 
         <motion.div
@@ -184,7 +184,7 @@ export default function LoginPage() {
                   <motion.div
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="text-red-600 text-sm bg-red-50 p-3 rounded-md"
+                    className="text-destructive text-sm bg-destructive/10 p-3 rounded-md border border-destructive/20"
                   >
                     {error}
                   </motion.div>
@@ -206,7 +206,7 @@ export default function LoginPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.8 }}
-          className="mt-6 text-center text-sm text-gray-600"
+          className="mt-6 text-center text-sm text-muted-foreground"
         >
           <p>Please contact your administrator for login credentials.</p>
         </motion.div>
