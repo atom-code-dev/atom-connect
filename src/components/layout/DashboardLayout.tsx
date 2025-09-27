@@ -80,20 +80,6 @@ const Sidebar = React.memo(({ userRole, pathname }: SidebarProps) => {
       transition={{ duration: 0.3, delay: 0.1 }}
       className="w-64 bg-card border-r flex flex-col"
     >
-      <div className="p-6 border-b">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-            <User className="h-4 w-4 text-white" />
-          </div>
-          <div>
-            <h2 className="font-semibold truncate">{userRole}</h2>
-            <Badge variant="outline" className="text-xs">
-              Control Panel
-            </Badge>
-          </div>
-        </div>
-      </div>
-      
       <nav className="flex-1 mt-6">
         <div className="px-4 space-y-1">
           {navItems.map((item) => {
@@ -157,14 +143,14 @@ export function DashboardLayout({ children, userRole, userName }: DashboardLayou
       transition={{ duration: 0.3 }}
       className="min-h-screen bg-background flex flex-col"
     >
-      {/* Topbar */}
+      {/* Topbar - Fixed */}
       <Topbar 
         userRole={userRole}
         userName={userName}
         showBackButton={!isDashboardPage}
       />
       
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden pt-16"> {/* Added padding-top for fixed topbar */}
         {/* Sidebar */}
         <Sidebar 
           userRole={userRole}

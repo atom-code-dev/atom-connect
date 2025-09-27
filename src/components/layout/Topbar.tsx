@@ -35,7 +35,7 @@ export function Topbar({ userRole, userName, showBackButton = false }: TopbarPro
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.3 }}
-      className="h-16 bg-card border-b border-border flex items-center justify-between px-6"
+      className="h-16 bg-card border-b border-border flex items-center justify-between px-6 fixed top-0 left-0 right-0 z-50"
     >
       {/* Left side - Breadcrumb/Navigation */}
       <div className="flex items-center gap-4">
@@ -72,9 +72,7 @@ export function Topbar({ userRole, userName, showBackButton = false }: TopbarPro
 
       {/* Right side - Theme toggle and Logout */}
       <div className="flex items-center gap-3">
-        <div className="bg-background/80 backdrop-blur-sm border border-border rounded-full p-1 shadow-sm">
-          <AnimatedThemeToggler className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground rounded-full transition-colors" />
-        </div>
+        <AnimatedThemeToggler className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground transition-colors" />
         
         <Button 
           variant="outline" 
