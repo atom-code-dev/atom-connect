@@ -6,7 +6,10 @@ import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { LogOut, Home } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Separator } from "@/components/ui/separator"
+import { LogOut, Home, Settings, Key, User } from "lucide-react"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import Link from "next/link"
 
@@ -56,19 +59,51 @@ export function Topbar({ userRole, userName }: TopbarProps) {
         </div>
       </div>
 
-      {/* Right side - Theme toggle and Logout */}
+      {/* Right side - Theme toggle and User Avatar */}
       <div className="flex items-center gap-3">
         <AnimatedThemeToggler className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground transition-colors" />
         
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={handleLogout}
-          className="gap-2"
-        >
-          <LogOut className="h-4 w-4" />
-          Logout
-        </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={session?.user?.image || ""} alt={userName} />
+                <AvatarFallback className="text-xs">
+                  {userName ? userName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) : 'U'}
+                </AvatarFallback>
+              </Avatar>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56" align="end" forceMount>
+            <div className="flex flex-col space-y-1">
+              <p className="text-sm font-medium leading-none">{userName}</p>
+              <p className="text-xs leading-none text-muted-foreground">{session?.user?.email}</p>
+              <Badge variant="outline" className="text-xs w-fit">
+                {userRole}
+              </Badge>
+            </div>
+            <Separator className="my-2" />
+            <div className="flex flex-col space-y-1">
+              <Button variant="ghost" className="w-full justify-start gap-2 h-8">
+                <User className="h-4 w-4" />
+                Account Settings
+              </Button>
+              <Button variant="ghost" className="w-full justify-start gap-2 h-8">
+                <Key className="h-4 w-4" />
+                Reset Password
+              </Button>
+              <Separator className="my-1" />
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-2 h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </motion.div>
   )
