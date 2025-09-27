@@ -169,3 +169,127 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session || !['ADMIN', 'MAINTAINER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { trainingIds, action } = body
+
+    if (!trainingIds || !Array.isArray(trainingIds) || trainingIds.length === 0) {
+      return NextResponse.json({ error: 'Invalid training IDs' }, { status: 400 })
+    }
+
+    const validActions = ['activate', 'deactivate', 'publish', 'unpublish', 'delete', 'approve', 'reject']
+    if (!validActions.includes(action)) {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
+
+    switch (action) {
+      case 'activate':
+        await db.training.updateMany({
+          where: { id: { in: trainingIds } },
+          data: { isActive: true }
+        })
+        break
+
+      case 'deactivate':
+        await db.training.updateMany({
+          where: { id: { in: trainingIds } },
+          data: { isActive: false }
+        })
+        break
+
+      case 'publish':
+        await db.training.updateMany({
+          where: { id: { in: trainingIds } },
+          data: { isPublished: true }
+        })
+        break
+
+      case 'unpublish':
+        await db.training.updateMany({
+          where: { id: { in: trainingIds } },
+          data: { isPublished: false }
+        })
+        break
+
+      case 'delete':
+        // Delete feedbacks first (due to foreign key constraints)
+        await db.trainingFeedback.deleteMany({
+          where: { trainingId: { in: trainingIds } }
+        })
+        
+        // Delete trainings
+        await db.training.deleteMany({
+          where: { id: { in: trainingIds } }
+        })
+        break
+
+      case 'approve':
+      case 'reject':
+        // For maintainer approval/rejection, we would need to add a status field to Training model
+        // For now, we'll just update the published status
+        const publishStatus = action === 'approve'
+        await db.training.updateMany({
+          where: { id: { in: trainingIds } },
+          data: { isPublished: publishStatus }
+        })
+        break
+    }
+
+    return NextResponse.json({ success: true, message: `${action} action completed` })
+  } catch (error) {
+    console.error('Error performing bulk action on trainings:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session || !['ADMIN', 'ORGANIZATION'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'Training ID is required' }, { status: 400 })
+    }
+
+    // Check if user owns the training (for organizations) or is admin
+    if (session.user.role === 'ORGANIZATION') {
+      const training = await db.training.findUnique({
+        where: { id },
+        include: { organization: true }
+      })
+
+      if (!training || training.organization.userId !== session.user.id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+    }
+
+    // Delete feedbacks first (due to foreign key constraints)
+    await db.trainingFeedback.deleteMany({
+      where: { trainingId: id }
+    })
+
+    // Delete training
+    await db.training.delete({
+      where: { id }
+    })
+
+    return NextResponse.json({ success: true, message: 'Training deleted successfully' })
+  } catch (error) {
+    console.error('Error deleting training:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}

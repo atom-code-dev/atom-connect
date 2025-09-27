@@ -24,6 +24,8 @@ import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { TrainingCategorySchema, TrainingLocationSchema, StackSchema } from "@/schema"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { BulkActions, RowCheckbox, commonBulkActions } from "@/components/ui/bulk-actions"
+import { exportToCSV, formatters } from "@/lib/export-utils"
 
 // Interfaces
 interface TrainingCategory {
@@ -497,6 +499,161 @@ export default function AdminTrainingsPage() {
     }
   }
 
+  // Bulk action handlers
+  const handleBulkCategoryAction = async (action: string) => {
+    try {
+      const response = await fetch('/api/training-categories', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          categoryIds: selectedCategories,
+          action
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to perform bulk action')
+      }
+
+      const actionMessages = {
+        activate: `Activated ${selectedCategories.length} categories`,
+        deactivate: `Deactivated ${selectedCategories.length} categories`,
+        delete: `Deleted ${selectedCategories.length} categories`,
+      }
+
+      toast.success(actionMessages[action as keyof typeof actionMessages] || "Bulk action completed")
+      setSelectedCategories([])
+      setIsCategorySelectAll(false)
+      fetchCategories()
+    } catch (error) {
+      console.error('Error performing bulk action:', error)
+      toast.error('Failed to perform bulk action')
+    }
+  }
+
+  const handleBulkLocationAction = async (action: string) => {
+    try {
+      const response = await fetch('/api/training-locations', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          locationIds: selectedLocations,
+          action
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to perform bulk action')
+      }
+
+      const actionMessages = {
+        activate: `Activated ${selectedLocations.length} locations`,
+        deactivate: `Deactivated ${selectedLocations.length} locations`,
+        delete: `Deleted ${selectedLocations.length} locations`,
+      }
+
+      toast.success(actionMessages[action as keyof typeof actionMessages] || "Bulk action completed")
+      setSelectedLocations([])
+      setIsLocationSelectAll(false)
+      fetchLocations()
+    } catch (error) {
+      console.error('Error performing bulk action:', error)
+      toast.error('Failed to perform bulk action')
+    }
+  }
+
+  const handleBulkStackAction = async (action: string) => {
+    try {
+      const response = await fetch('/api/stacks', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          stackIds: selectedStacks,
+          action
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to perform bulk action')
+      }
+
+      const actionMessages = {
+        delete: `Deleted ${selectedStacks.length} stacks`,
+      }
+
+      toast.success(actionMessages[action as keyof typeof actionMessages] || "Bulk action completed")
+      setSelectedStacks([])
+      setIsStackSelectAll(false)
+      fetchStacks()
+    } catch (error) {
+      console.error('Error performing bulk action:', error)
+      toast.error('Failed to perform bulk action')
+    }
+  }
+
+  // Export handlers
+  const handleExportCategories = () => {
+    const categoriesToExport = selectedCategories.length > 0 
+      ? filteredCategories.filter(cat => selectedCategories.includes(cat.id))
+      : filteredCategories
+
+    const columns = [
+      { key: 'name', label: 'Name' },
+      { key: 'description', label: 'Description' },
+      { key: 'isActive', label: 'Active', formatter: formatters.boolean },
+      { key: 'trainingsCount', label: 'Total Trainings', formatter: formatters.number },
+      { key: 'activeTrainingsCount', label: 'Active Trainings', formatter: formatters.number },
+      { key: 'createdAt', label: 'Created Date', formatter: formatters.date },
+    ]
+
+    exportToCSV(categoriesToExport, columns, 'training_categories')
+    toast.success(`Exported ${categoriesToExport.length} categories`)
+  }
+
+  const handleExportLocations = () => {
+    const locationsToExport = selectedLocations.length > 0 
+      ? filteredLocations.filter(loc => selectedLocations.includes(loc.id))
+      : filteredLocations
+
+    const columns = [
+      { key: 'state', label: 'State' },
+      { key: 'district', label: 'District' },
+      { key: 'isActive', label: 'Active', formatter: formatters.boolean },
+      { key: 'trainingsCount', label: 'Total Trainings', formatter: formatters.number },
+      { key: 'activeTrainingsCount', label: 'Active Trainings', formatter: formatters.number },
+      { key: 'createdAt', label: 'Created Date', formatter: formatters.date },
+    ]
+
+    exportToCSV(locationsToExport, columns, 'training_locations')
+    toast.success(`Exported ${locationsToExport.length} locations`)
+  }
+
+  const handleExportStacks = () => {
+    const stacksToExport = selectedStacks.length > 0 
+      ? filteredStacks.filter(stack => selectedStacks.includes(stack.id))
+      : filteredStacks
+
+    const columns = [
+      { key: 'name', label: 'Name' },
+      { key: 'description', label: 'Description' },
+      { key: 'trainingsCount', label: 'Total Trainings', formatter: formatters.number },
+      { key: 'activeTrainingsCount', label: 'Active Trainings', formatter: formatters.number },
+      { key: 'createdAt', label: 'Created Date', formatter: formatters.date },
+    ]
+
+    exportToCSV(stacksToExport, columns, 'stacks')
+    toast.success(`Exported ${stacksToExport.length} stacks`)
+  }
+
   if (status === "loading" || !session || session.user.role !== "ADMIN") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -698,6 +855,25 @@ export default function AdminTrainingsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {/* Bulk Actions */}
+                  <BulkActions
+                    selectedItems={selectedCategories}
+                    totalItems={categories.length}
+                    filteredItems={filteredCategories}
+                    onSelectAll={handleSelectAllCategories}
+                    onSelectItem={handleSelectCategory}
+                    onBulkAction={handleBulkCategoryAction}
+                    onExport={handleExportCategories}
+                    actionOptions={[
+                      commonBulkActions.activate,
+                      commonBulkActions.deactivate,
+                      commonBulkActions.delete,
+                    ]}
+                    itemName="categories"
+                    isSelectAll={isCategorySelectAll}
+                    loading={categoriesLoading}
+                  />
+
                   {/* Search and Filter */}
                   <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex-1">
@@ -766,10 +942,10 @@ export default function AdminTrainingsPage() {
                           filteredCategories.map((category) => (
                             <TableRow key={category.id}>
                               <TableCell>
-                                <Checkbox
-                                  checked={selectedCategories.includes(category.id)}
-                                  onCheckedChange={(checked) => handleSelectCategory(category.id, checked as boolean)}
-                                  aria-label={`Select category ${category.name}`}
+                                <RowCheckbox
+                                  itemId={category.id}
+                                  isSelected={selectedCategories.includes(category.id)}
+                                  onSelect={handleSelectCategory}
                                 />
                               </TableCell>
                               <TableCell className="font-medium">{category.name}</TableCell>
@@ -920,6 +1096,25 @@ export default function AdminTrainingsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {/* Bulk Actions */}
+                  <BulkActions
+                    selectedItems={selectedLocations}
+                    totalItems={locations.length}
+                    filteredItems={filteredLocations}
+                    onSelectAll={handleSelectAllLocations}
+                    onSelectItem={handleSelectLocation}
+                    onBulkAction={handleBulkLocationAction}
+                    onExport={handleExportLocations}
+                    actionOptions={[
+                      commonBulkActions.activate,
+                      commonBulkActions.deactivate,
+                      commonBulkActions.delete,
+                    ]}
+                    itemName="locations"
+                    isSelectAll={isLocationSelectAll}
+                    loading={locationsLoading}
+                  />
+
                   {/* Search and Filter */}
                   <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex-1">
@@ -988,10 +1183,10 @@ export default function AdminTrainingsPage() {
                           filteredLocations.map((location) => (
                             <TableRow key={location.id}>
                               <TableCell>
-                                <Checkbox
-                                  checked={selectedLocations.includes(location.id)}
-                                  onCheckedChange={(checked) => handleSelectLocation(location.id, checked as boolean)}
-                                  aria-label={`Select location ${location.state}, ${location.district}`}
+                                <RowCheckbox
+                                  itemId={location.id}
+                                  isSelected={selectedLocations.includes(location.id)}
+                                  onSelect={handleSelectLocation}
                                 />
                               </TableCell>
                               <TableCell className="font-medium">{location.state}</TableCell>
@@ -1122,6 +1317,23 @@ export default function AdminTrainingsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {/* Bulk Actions */}
+                  <BulkActions
+                    selectedItems={selectedStacks}
+                    totalItems={stacks.length}
+                    filteredItems={filteredStacks}
+                    onSelectAll={handleSelectAllStacks}
+                    onSelectItem={handleSelectStack}
+                    onBulkAction={handleBulkStackAction}
+                    onExport={handleExportStacks}
+                    actionOptions={[
+                      commonBulkActions.delete,
+                    ]}
+                    itemName="stacks"
+                    isSelectAll={isStackSelectAll}
+                    loading={stacksLoading}
+                  />
+
                   {/* Search */}
                   <div className="flex-1">
                     <div className="relative">
@@ -1176,10 +1388,10 @@ export default function AdminTrainingsPage() {
                           filteredStacks.map((stack) => (
                             <TableRow key={stack.id}>
                               <TableCell>
-                                <Checkbox
-                                  checked={selectedStacks.includes(stack.id)}
-                                  onCheckedChange={(checked) => handleSelectStack(stack.id, checked as boolean)}
-                                  aria-label={`Select stack ${stack.name}`}
+                                <RowCheckbox
+                                  itemId={stack.id}
+                                  isSelected={selectedStacks.includes(stack.id)}
+                                  onSelect={handleSelectStack}
                                 />
                               </TableCell>
                               <TableCell className="font-medium">{stack.name}</TableCell>

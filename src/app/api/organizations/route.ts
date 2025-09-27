@@ -170,3 +170,137 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session || !['ADMIN', 'MAINTAINER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { organizationIds, action } = body
+
+    if (!organizationIds || !Array.isArray(organizationIds) || organizationIds.length === 0) {
+      return NextResponse.json({ error: 'Invalid organization IDs' }, { status: 400 })
+    }
+
+    const validActions = ['activate', 'deactivate', 'verify', 'unverify', 'delete']
+    if (!validActions.includes(action)) {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
+
+    switch (action) {
+      case 'activate':
+        await db.organizationProfile.updateMany({
+          where: { id: { in: organizationIds } },
+          data: { activeStatus: 'ACTIVE' }
+        })
+        break
+
+      case 'deactivate':
+        await db.organizationProfile.updateMany({
+          where: { id: { in: organizationIds } },
+          data: { activeStatus: 'INACTIVE' }
+        })
+        break
+
+      case 'verify':
+        await db.organizationProfile.updateMany({
+          where: { id: { in: organizationIds } },
+          data: { verifiedStatus: 'VERIFIED' }
+        })
+        break
+
+      case 'unverify':
+        await db.organizationProfile.updateMany({
+          where: { id: { in: organizationIds } },
+          data: { verifiedStatus: 'PENDING' }
+        })
+        break
+
+      case 'delete':
+        // Delete feedbacks first (due to foreign key constraints)
+        await db.trainingFeedback.deleteMany({
+          where: { organizationId: { in: organizationIds } }
+        })
+        
+        // Delete trainings
+        await db.training.deleteMany({
+          where: { organizationId: { in: organizationIds } }
+        })
+        
+        // Delete organization profiles
+        await db.organizationProfile.deleteMany({
+          where: { id: { in: organizationIds } }
+        })
+        
+        // Delete users
+        const organizationsToDelete = await db.organizationProfile.findMany({
+          where: { id: { in: organizationIds } },
+          select: { userId: true }
+        })
+        
+        await db.user.deleteMany({
+          where: { id: { in: organizationsToDelete.map(org => org.userId) } }
+        })
+        break
+    }
+
+    return NextResponse.json({ success: true, message: `${action} action completed` })
+  } catch (error) {
+    console.error('Error performing bulk action on organizations:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'Organization ID is required' }, { status: 400 })
+    }
+
+    // Delete feedbacks first (due to foreign key constraints)
+    await db.trainingFeedback.deleteMany({
+      where: { organizationId: id }
+    })
+
+    // Delete trainings
+    await db.training.deleteMany({
+      where: { organizationId: id }
+    })
+
+    // Get organization profile to delete user
+    const organizationProfile = await db.organizationProfile.findUnique({
+      where: { id },
+      select: { userId: true }
+    })
+
+    if (organizationProfile) {
+      // Delete organization profile
+      await db.organizationProfile.delete({
+        where: { id }
+      })
+
+      // Delete user
+      await db.user.delete({
+        where: { id: organizationProfile.userId }
+      })
+    }
+
+    return NextResponse.json({ success: true, message: 'Organization deleted successfully' })
+  } catch (error) {
+    console.error('Error deleting organization:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}

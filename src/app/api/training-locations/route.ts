@@ -192,6 +192,69 @@ export async function PUT(request: NextRequest) {
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { locationIds, action } = body
+
+    if (!locationIds || !Array.isArray(locationIds) || locationIds.length === 0) {
+      return NextResponse.json({ error: 'Invalid location IDs' }, { status: 400 })
+    }
+
+    const validActions = ['activate', 'deactivate', 'delete']
+    if (!validActions.includes(action)) {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
+
+    switch (action) {
+      case 'activate':
+        await db.trainingLocation.updateMany({
+          where: { id: { in: locationIds } },
+          data: { isActive: true }
+        })
+        break
+
+      case 'deactivate':
+        await db.trainingLocation.updateMany({
+          where: { id: { in: locationIds } },
+          data: { isActive: false }
+        })
+        break
+
+      case 'delete':
+        // Check if locations have associated trainings
+        const locationsWithTrainings = await db.trainingLocation.findMany({
+          where: { 
+            id: { in: locationIds },
+            trainings: { some: {} }
+          }
+        })
+
+        if (locationsWithTrainings.length > 0) {
+          return NextResponse.json({ 
+            error: 'Cannot delete locations with associated trainings. Please reassign or delete the trainings first.' 
+          }, { status: 400 })
+        }
+
+        await db.trainingLocation.deleteMany({
+          where: { id: { in: locationIds } }
+        })
+        break
+    }
+
+    return NextResponse.json({ success: true, message: `${action} action completed` })
+  } catch (error) {
+    console.error('Error performing bulk action on training locations:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)

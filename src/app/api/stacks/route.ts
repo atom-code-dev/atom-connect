@@ -181,6 +181,55 @@ export async function PUT(request: NextRequest) {
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { stackIds, action } = body
+
+    if (!stackIds || !Array.isArray(stackIds) || stackIds.length === 0) {
+      return NextResponse.json({ error: 'Invalid stack IDs' }, { status: 400 })
+    }
+
+    const validActions = ['delete']
+    if (!validActions.includes(action)) {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
+
+    switch (action) {
+      case 'delete':
+        // Check if stacks have associated trainings
+        const stacksWithTrainings = await db.stack.findMany({
+          where: { 
+            id: { in: stackIds },
+            trainings: { some: {} }
+          }
+        })
+
+        if (stacksWithTrainings.length > 0) {
+          return NextResponse.json({ 
+            error: 'Cannot delete stacks with associated trainings. Please reassign or delete the trainings first.' 
+          }, { status: 400 })
+        }
+
+        await db.stack.deleteMany({
+          where: { id: { in: stackIds } }
+        })
+        break
+    }
+
+    return NextResponse.json({ success: true, message: `${action} action completed` })
+  } catch (error) {
+    console.error('Error performing bulk action on stacks:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)

@@ -179,3 +179,125 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session || !['ADMIN', 'MAINTAINER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { freelancerIds, action } = body
+
+    if (!freelancerIds || !Array.isArray(freelancerIds) || freelancerIds.length === 0) {
+      return NextResponse.json({ error: 'Invalid freelancer IDs' }, { status: 400 })
+    }
+
+    const validActions = ['activate', 'deactivate', 'delete']
+    if (!validActions.includes(action)) {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
+
+    switch (action) {
+      case 'activate':
+        await db.freelancerProfile.updateMany({
+          where: { id: { in: freelancerIds } },
+          data: { availability: 'AVAILABLE' }
+        })
+        break
+
+      case 'deactivate':
+        await db.freelancerProfile.updateMany({
+          where: { id: { in: freelancerIds } },
+          data: { availability: 'NOT_AVAILABLE' }
+        })
+        break
+
+      case 'delete':
+        // Delete feedbacks first (due to foreign key constraints)
+        await db.trainingFeedback.deleteMany({
+          where: { freelancerId: { in: freelancerIds } }
+        })
+        
+        // Update trainings to remove freelancer assignment
+        await db.training.updateMany({
+          where: { freelancerId: { in: freelancerIds } },
+          data: { freelancerId: null }
+        })
+        
+        // Delete freelancer profiles
+        await db.freelancerProfile.deleteMany({
+          where: { id: { in: freelancerIds } }
+        })
+        
+        // Delete users
+        const freelancersToDelete = await db.freelancerProfile.findMany({
+          where: { id: { in: freelancerIds } },
+          select: { userId: true }
+        })
+        
+        await db.user.deleteMany({
+          where: { id: { in: freelancersToDelete.map(freelancer => freelancer.userId) } }
+        })
+        break
+    }
+
+    return NextResponse.json({ success: true, message: `${action} action completed` })
+  } catch (error) {
+    console.error('Error performing bulk action on freelancers:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'Freelancer ID is required' }, { status: 400 })
+    }
+
+    // Delete feedbacks first (due to foreign key constraints)
+    await db.trainingFeedback.deleteMany({
+      where: { freelancerId: id }
+    })
+
+    // Update trainings to remove freelancer assignment
+    await db.training.updateMany({
+      where: { freelancerId: id },
+      data: { freelancerId: null }
+    })
+
+    // Get freelancer profile to delete user
+    const freelancerProfile = await db.freelancerProfile.findUnique({
+      where: { id },
+      select: { userId: true }
+    })
+
+    if (freelancerProfile) {
+      // Delete freelancer profile
+      await db.freelancerProfile.delete({
+        where: { id }
+      })
+
+      // Delete user
+      await db.user.delete({
+        where: { id: freelancerProfile.userId }
+      })
+    }
+
+    return NextResponse.json({ success: true, message: 'Freelancer deleted successfully' })
+  } catch (error) {
+    console.error('Error deleting freelancer:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}
