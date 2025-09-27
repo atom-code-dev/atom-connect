@@ -106,8 +106,10 @@ export default function LoginPage() {
       className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4"
     >
       {/* Theme toggle in top right corner */}
-      <div className="absolute top-4 right-4">
-      <AnimatedThemeToggler className="h-9 w-9 p-0" />
+      <div className="absolute top-4 right-4 z-50">
+        <div className="bg-background/80 backdrop-blur-sm border border-border rounded-full p-1 shadow-sm">
+          <AnimatedThemeToggler className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground rounded-full transition-colors" />
+        </div>
       </div>
       
       <div className="w-full max-w-md">
