@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { User, LogOut, Settings, LayoutDashboard, Users, Building, BookOpen, MessageSquare, Calendar, Star, ChevronRight } from "lucide-react"
 import { motion } from "framer-motion"
-import { ThemeToggle } from "@/components/ui/theme-toggle"
+import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import Link from "next/link"
 
 interface DashboardLayoutProps {
@@ -125,7 +125,7 @@ const Sidebar = React.memo(({ userRole, userName, pathname, onLogout }: SidebarP
 
       <div className="p-4 border-t">
         <div className="flex items-center gap-2 mb-3">
-          <ThemeToggle />
+          <AnimatedThemeToggler className="h-8 w-8 p-0" />
         </div>
         <Button 
           variant="outline" 
