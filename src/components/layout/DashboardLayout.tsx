@@ -1,15 +1,15 @@
 "use client"
 
 import React from "react"
-import { useSession, signOut } from "next-auth/react"
+import { useSession } from "next-auth/react"
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { User, LogOut, Settings, LayoutDashboard, Users, Building, BookOpen, MessageSquare, Calendar, Star, ChevronRight } from "lucide-react"
+import { User, LayoutDashboard, Users, Building, BookOpen, MessageSquare, Calendar, Star, ChevronRight } from "lucide-react"
 import { motion } from "framer-motion"
-import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
+import { Topbar } from "./Topbar"
 import Link from "next/link"
 
 interface DashboardLayoutProps {
@@ -26,12 +26,10 @@ interface NavItem {
 
 interface SidebarProps {
   userRole: string
-  userName: string
   pathname: string
-  onLogout: () => void
 }
 
-const Sidebar = React.memo(({ userRole, userName, pathname, onLogout }: SidebarProps) => {
+const Sidebar = React.memo(({ userRole, pathname }: SidebarProps) => {
   const getNavItems = useMemo((): NavItem[] => {
     const baseItems = [
       { href: `/${userRole.toLowerCase()}`, label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> }
@@ -44,7 +42,7 @@ const Sidebar = React.memo(({ userRole, userName, pathname, onLogout }: SidebarP
           { href: "/admin/dashboard/users", label: "Users", icon: <Users className="h-4 w-4" /> },
           { href: "/admin/dashboard/organizations", label: "Organizations", icon: <Building className="h-4 w-4" /> },
           { href: "/admin/dashboard/trainings", label: "Trainings", icon: <BookOpen className="h-4 w-4" /> },
-          { href: "/admin/dashboard/maintainers", label: "Maintainers", icon: <Settings className="h-4 w-4" /> },
+          { href: "/admin/dashboard/maintainers", label: "Maintainers", icon: <User className="h-4 w-4" /> },
         ]
       case "FREELANCER":
         return [
@@ -85,12 +83,12 @@ const Sidebar = React.memo(({ userRole, userName, pathname, onLogout }: SidebarP
       <div className="p-6 border-b">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-            <Settings className="h-4 w-4 text-white" />
+            <User className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h2 className="font-semibold truncate">{userName}</h2>
+            <h2 className="font-semibold truncate">{userRole}</h2>
             <Badge variant="outline" className="text-xs">
-              {userRole}
+              Control Panel
             </Badge>
           </div>
         </div>
@@ -122,20 +120,6 @@ const Sidebar = React.memo(({ userRole, userName, pathname, onLogout }: SidebarP
           })}
         </div>
       </nav>
-
-      <div className="p-4 border-t">
-        <div className="flex items-center gap-2 mb-3">
-          <AnimatedThemeToggler className="h-8 w-8 p-0" />
-        </div>
-        <Button 
-          variant="outline" 
-          className="w-full justify-start"
-          onClick={onLogout}
-        >
-          <LogOut className="h-4 w-4 mr-2" />
-          Logout
-        </Button>
-      </div>
     </motion.div>
   )
 })
@@ -153,9 +137,7 @@ export function DashboardLayout({ children, userRole, userName }: DashboardLayou
     }
   }, [status, router])
 
-  const handleLogout = () => {
-    signOut({ callbackUrl: "/" })
-  }
+  const isDashboardPage = pathname === `/${userRole.toLowerCase()}`
 
   if (status === "loading") {
     return (
@@ -173,15 +155,20 @@ export function DashboardLayout({ children, userRole, userName }: DashboardLayou
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
-      className="min-h-screen bg-background"
+      className="min-h-screen bg-background flex flex-col"
     >
-      <div className="flex h-screen">
-        {/* Sidebar - now memoized to prevent unnecessary re-renders */}
+      {/* Topbar */}
+      <Topbar 
+        userRole={userRole}
+        userName={userName}
+        showBackButton={!isDashboardPage}
+      />
+      
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
         <Sidebar 
           userRole={userRole}
-          userName={userName}
           pathname={pathname}
-          onLogout={handleLogout}
         />
         
         {/* Main content */}
