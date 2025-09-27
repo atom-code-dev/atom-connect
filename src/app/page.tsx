@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Users } from "lucide-react"
 import { toast } from "sonner"
 import { motion } from "framer-motion"
-import { ThemeToggle } from "@/components/ui/theme-toggle"
+import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 
 export default function LoginPage() {
   const { data: session, status } = useSession()
@@ -107,7 +107,7 @@ export default function LoginPage() {
     >
       {/* Theme toggle in top right corner */}
       <div className="absolute top-4 right-4">
-        <ThemeToggle />
+        <AnimatedThemeToggler className="h-9 w-9 p-0" />
       </div>
       
       <div className="w-full max-w-md">
