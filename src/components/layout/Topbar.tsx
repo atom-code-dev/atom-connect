@@ -85,16 +85,12 @@ export function Topbar({ userRole, userName }: TopbarProps) {
             </div>
             <Separator className="my-2" />
             <div className="flex flex-col space-y-1">
-              <Button variant="ghost" className="w-full justify-start gap-2 h-8">
-                <User className="h-4 w-4" />
-                Account Settings
-              </Button>
-              <ResetPasswordDialog>
+              <Link href={`/${userRole.toLowerCase()}/account-settings`}>
                 <Button variant="ghost" className="w-full justify-start gap-2 h-8">
-                  <Key className="h-4 w-4" />
-                  Reset Password
+                  <User className="h-4 w-4" />
+                  Account Settings
                 </Button>
-              </ResetPasswordDialog>
+              </Link>
               <Separator className="my-1" />
               <Button 
                 variant="ghost" 
