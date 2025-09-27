@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState, useCallback, useMemo, useTransition } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -18,7 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Search, Edit, Trash2, MoreHorizontal, Settings, Download, Upload, MapPin, Code, FolderOpen, Grid3X3 } from "lucide-react"
+import { Plus, Search, Edit, Trash2, MoreHorizontal, Settings, Download, Upload, MapPin, Code, FolderOpen, Grid3X3, Calendar, DollarSign, Users, Building, Eye, EyeOff, CheckCircle, XCircle, BookOpen } from "lucide-react"
 import HexagonLoader from "@/components/ui/hexagon-loader"
 import { toast } from "sonner"
 import { useForm, Controller } from "react-hook-form"
@@ -61,10 +61,56 @@ interface Stack {
   activeTrainingsCount: number
 }
 
+interface Training {
+  id: string
+  title: string
+  description: string
+  skills: string[]
+  type: string
+  startDate: string
+  endDate: string
+  paymentTerm: number
+  paymentAmount: number
+  isPublished: boolean
+  isActive: boolean
+  companyName: string
+  companyLogo?: string
+  createdAt: string
+  updatedAt: string
+  category: {
+    id: string
+    name: string
+  }
+  location: {
+    id: string
+    state: string
+    district: string
+  }
+  stack: {
+    id: string
+    name: string
+  }
+  organization: {
+    id: string
+    organizationName: string
+    user: {
+      id: string
+      email: string
+    }
+  }
+  freelancer?: {
+    id: string
+    name: string
+    user: {
+      id: string
+      email: string
+    }
+  }
+}
+
 export default function AdminTrainingsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [isPending, startTransition] = useTransition()
 
   // Categories state
   const [categories, setCategories] = useState<TrainingCategory[]>([])
@@ -88,6 +134,15 @@ export default function AdminTrainingsPage() {
   const [stackSearchTerm, setStackSearchTerm] = useState("")
   const [selectedStacks, setSelectedStacks] = useState<string[]>([])
   const [isStackSelectAll, setIsStackSelectAll] = useState(false)
+
+  // Trainings state
+  const [trainings, setTrainings] = useState<Training[]>([])
+  const [trainingsLoading, setTrainingsLoading] = useState(true)
+  const [trainingSearchTerm, setTrainingSearchTerm] = useState("")
+  const [trainingTypeFilter, setTrainingTypeFilter] = useState("ALL")
+  const [trainingStatusFilter, setTrainingStatusFilter] = useState("ALL")
+  const [selectedTrainings, setSelectedTrainings] = useState<string[]>([])
+  const [isTrainingSelectAll, setIsTrainingSelectAll] = useState(false)
 
   // Dialog states
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
@@ -190,6 +245,31 @@ export default function AdminTrainingsPage() {
     }
   }, [stackSearchTerm])
 
+  const fetchTrainings = useCallback(async () => {
+    try {
+      setTrainingsLoading(true)
+      const params = new URLSearchParams({
+        search: trainingSearchTerm,
+        ...(trainingTypeFilter !== "ALL" && { type: trainingTypeFilter }),
+        ...(trainingStatusFilter !== "ALL" && { 
+          status: trainingStatusFilter === "ACTIVE" ? "active" : "inactive" 
+        }),
+      })
+      
+      const response = await fetch(`/api/trainings?${params}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch trainings')
+      }
+      const data = await response.json()
+      setTrainings(data.trainings || data)
+    } catch (error) {
+      console.error('Error fetching trainings:', error)
+      toast.error('Failed to load trainings')
+    } finally {
+      setTrainingsLoading(false)
+    }
+  }, [trainingSearchTerm, trainingTypeFilter, trainingStatusFilter])
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/")
@@ -207,8 +287,9 @@ export default function AdminTrainingsPage() {
       fetchCategories()
       fetchLocations()
       fetchStacks()
+      fetchTrainings()
     }
-  }, [status, session, fetchCategories, fetchLocations, fetchStacks])
+  }, [status, session, fetchCategories, fetchLocations, fetchStacks, fetchTrainings])
 
   // Reset forms when dialogs are closed
   useEffect(() => {
@@ -254,6 +335,14 @@ export default function AdminTrainingsPage() {
     )
   }, [stacks, stackSearchTerm])
 
+  const filteredTrainings = useMemo(() => {
+    return trainings.filter(training =>
+      training.title.toLowerCase().includes(trainingSearchTerm.toLowerCase()) ||
+      training.description.toLowerCase().includes(trainingSearchTerm.toLowerCase()) ||
+      training.companyName.toLowerCase().includes(trainingSearchTerm.toLowerCase())
+    )
+  }, [trainings, trainingSearchTerm])
+
   // Edit handlers
   const handleEditCategory = (category: TrainingCategory) => {
     setEditingCategory(category)
@@ -286,108 +375,102 @@ export default function AdminTrainingsPage() {
 
   // Save handlers
   const handleSaveCategory = categoryForm.handleSubmit(async (data) => {
-    startTransition(async () => {
-      try {
-        const url = editingCategory ? '/api/training-categories' : '/api/training-categories'
-        const method = editingCategory ? 'PUT' : 'POST'
-        const body = {
-          ...(editingCategory && { id: editingCategory.id }),
-          ...data,
-        }
-
-        const response = await fetch(url, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(body),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Failed to save category')
-        }
-
-        toast.success(`Training category ${editingCategory ? 'updated' : 'created'} successfully`)
-        setIsCategoryDialogOpen(false)
-        setEditingCategory(null)
-        categoryForm.reset()
-        fetchCategories()
-      } catch (error) {
-        console.error('Error saving category:', error)
-        toast.error(error instanceof Error ? error.message : 'Failed to save category')
+    try {
+      const url = editingCategory ? '/api/training-categories' : '/api/training-categories'
+      const method = editingCategory ? 'PUT' : 'POST'
+      const body = {
+        ...(editingCategory && { id: editingCategory.id }),
+        ...data,
       }
-    })
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save category')
+      }
+
+      toast.success(`Training category ${editingCategory ? 'updated' : 'created'} successfully`)
+      setIsCategoryDialogOpen(false)
+      setEditingCategory(null)
+      categoryForm.reset()
+      fetchCategories()
+    } catch (error) {
+      console.error('Error saving category:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to save category')
+    }
   })
 
   const handleSaveLocation = locationForm.handleSubmit(async (data) => {
-    startTransition(async () => {
-      try {
-        const url = editingLocation ? '/api/training-locations' : '/api/training-locations'
-        const method = editingLocation ? 'PUT' : 'POST'
-        const body = {
-          ...(editingLocation && { id: editingLocation.id }),
-          ...data,
-        }
-
-        const response = await fetch(url, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(body),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Failed to save location')
-        }
-
-        toast.success(`Training location ${editingLocation ? 'updated' : 'created'} successfully`)
-        setIsLocationDialogOpen(false)
-        setEditingLocation(null)
-        locationForm.reset()
-        fetchLocations()
-      } catch (error) {
-        console.error('Error saving location:', error)
-        toast.error(error instanceof Error ? error.message : 'Failed to save location')
+    try {
+      const url = editingLocation ? '/api/training-locations' : '/api/training-locations'
+      const method = editingLocation ? 'PUT' : 'POST'
+      const body = {
+        ...(editingLocation && { id: editingLocation.id }),
+        ...data,
       }
-    })
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save location')
+      }
+
+      toast.success(`Training location ${editingLocation ? 'updated' : 'created'} successfully`)
+      setIsLocationDialogOpen(false)
+      setEditingLocation(null)
+      locationForm.reset()
+      fetchLocations()
+    } catch (error) {
+      console.error('Error saving location:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to save location')
+    }
   })
 
   const handleSaveStack = stackForm.handleSubmit(async (data) => {
-    startTransition(async () => {
-      try {
-        const url = editingStack ? '/api/stacks' : '/api/stacks'
-        const method = editingStack ? 'PUT' : 'POST'
-        const body = {
-          ...(editingStack && { id: editingStack.id }),
-          ...data,
-        }
-
-        const response = await fetch(url, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(body),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Failed to save stack')
-        }
-
-        toast.success(`Stack ${editingStack ? 'updated' : 'created'} successfully`)
-        setIsStackDialogOpen(false)
-        setEditingStack(null)
-        stackForm.reset()
-        fetchStacks()
-      } catch (error) {
-        console.error('Error saving stack:', error)
-        toast.error(error instanceof Error ? error.message : 'Failed to save stack')
+    try {
+      const url = editingStack ? '/api/stacks' : '/api/stacks'
+      const method = editingStack ? 'PUT' : 'POST'
+      const body = {
+        ...(editingStack && { id: editingStack.id }),
+        ...data,
       }
-    })
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save stack')
+      }
+
+      toast.success(`Stack ${editingStack ? 'updated' : 'created'} successfully`)
+      setIsStackDialogOpen(false)
+      setEditingStack(null)
+      stackForm.reset()
+      fetchStacks()
+    } catch (error) {
+      console.error('Error saving stack:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to save stack')
+    }
   })
 
   // Delete handlers
@@ -448,7 +531,61 @@ export default function AdminTrainingsPage() {
     }
   }
 
-  // Select handlers
+  // Training management handlers
+  const handleTrainingAction = async (trainingIds: string[], action: string) => {
+    try {
+      const response = await fetch('/api/trainings', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          trainingIds,
+          action
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to perform action')
+      }
+
+      const actionMessages = {
+        activate: `Activated ${trainingIds.length} trainings`,
+        deactivate: `Deactivated ${trainingIds.length} trainings`,
+        publish: `Published ${trainingIds.length} trainings`,
+        unpublish: `Unpublished ${trainingIds.length} trainings`,
+        delete: `Deleted ${trainingIds.length} trainings`,
+      }
+
+      toast.success(actionMessages[action as keyof typeof actionMessages] || "Action completed")
+      setSelectedTrainings([])
+      setIsTrainingSelectAll(false)
+      fetchTrainings()
+    } catch (error) {
+      console.error('Error performing training action:', error)
+      toast.error('Failed to perform action')
+    }
+  }
+
+  const handleSelectTraining = (trainingId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedTrainings(prev => [...prev, trainingId])
+    } else {
+      setSelectedTrainings(prev => prev.filter(id => id !== trainingId))
+    }
+  }
+
+  const handleSelectAllTrainings = (checked: boolean) => {
+    setIsTrainingSelectAll(checked)
+    if (checked) {
+      setSelectedTrainings(filteredTrainings.map(training => training.id))
+    } else {
+      setSelectedTrainings([])
+    }
+  }
+
+  // Select handlers for other entities
   const handleSelectCategory = (categoryId: string, checked: boolean) => {
     if (checked) {
       setSelectedCategories(prev => [...prev, categoryId])
@@ -461,7 +598,7 @@ export default function AdminTrainingsPage() {
     if (checked) {
       setSelectedLocations(prev => [...prev, locationId])
     } else {
-      setSelectedLocations(prev => prev.filter(id => id !== location))
+      setSelectedLocations(prev => prev.filter(id => id !== locationId))
     }
   }
 
@@ -469,7 +606,7 @@ export default function AdminTrainingsPage() {
     if (checked) {
       setSelectedStacks(prev => [...prev, stackId])
     } else {
-      setSelectedStacks(prev => prev.filter(id => id !== stack))
+      setSelectedStacks(prev => prev.filter(id => id !== stackId))
     }
   }
 
@@ -500,162 +637,7 @@ export default function AdminTrainingsPage() {
     }
   }
 
-  // Bulk action handlers
-  const handleBulkCategoryAction = async (action: string) => {
-    try {
-      const response = await fetch('/api/training-categories', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          categoryIds: selectedCategories,
-          action
-        })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to perform bulk action')
-      }
-
-      const actionMessages = {
-        activate: `Activated ${selectedCategories.length} categories`,
-        deactivate: `Deactivated ${selectedCategories.length} categories`,
-        delete: `Deleted ${selectedCategories.length} categories`,
-      }
-
-      toast.success(actionMessages[action as keyof typeof actionMessages] || "Bulk action completed")
-      setSelectedCategories([])
-      setIsCategorySelectAll(false)
-      fetchCategories()
-    } catch (error) {
-      console.error('Error performing bulk action:', error)
-      toast.error('Failed to perform bulk action')
-    }
-  }
-
-  const handleBulkLocationAction = async (action: string) => {
-    try {
-      const response = await fetch('/api/training-locations', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          locationIds: selectedLocations,
-          action
-        })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to perform bulk action')
-      }
-
-      const actionMessages = {
-        activate: `Activated ${selectedLocations.length} locations`,
-        deactivate: `Deactivated ${selectedLocations.length} locations`,
-        delete: `Deleted ${selectedLocations.length} locations`,
-      }
-
-      toast.success(actionMessages[action as keyof typeof actionMessages] || "Bulk action completed")
-      setSelectedLocations([])
-      setIsLocationSelectAll(false)
-      fetchLocations()
-    } catch (error) {
-      console.error('Error performing bulk action:', error)
-      toast.error('Failed to perform bulk action')
-    }
-  }
-
-  const handleBulkStackAction = async (action: string) => {
-    try {
-      const response = await fetch('/api/stacks', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          stackIds: selectedStacks,
-          action
-        })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to perform bulk action')
-      }
-
-      const actionMessages = {
-        delete: `Deleted ${selectedStacks.length} stacks`,
-      }
-
-      toast.success(actionMessages[action as keyof typeof actionMessages] || "Bulk action completed")
-      setSelectedStacks([])
-      setIsStackSelectAll(false)
-      fetchStacks()
-    } catch (error) {
-      console.error('Error performing bulk action:', error)
-      toast.error('Failed to perform bulk action')
-    }
-  }
-
-  // Export handlers
-  const handleExportCategories = () => {
-    const categoriesToExport = selectedCategories.length > 0 
-      ? filteredCategories.filter(cat => selectedCategories.includes(cat.id))
-      : filteredCategories
-
-    const columns = [
-      { key: 'name', label: 'Name' },
-      { key: 'description', label: 'Description' },
-      { key: 'isActive', label: 'Active', formatter: formatters.boolean },
-      { key: 'trainingsCount', label: 'Total Trainings', formatter: formatters.number },
-      { key: 'activeTrainingsCount', label: 'Active Trainings', formatter: formatters.number },
-      { key: 'createdAt', label: 'Created Date', formatter: formatters.date },
-    ]
-
-    exportToCSV(categoriesToExport, columns, 'training_categories')
-    toast.success(`Exported ${categoriesToExport.length} categories`)
-  }
-
-  const handleExportLocations = () => {
-    const locationsToExport = selectedLocations.length > 0 
-      ? filteredLocations.filter(loc => selectedLocations.includes(loc.id))
-      : filteredLocations
-
-    const columns = [
-      { key: 'state', label: 'State' },
-      { key: 'district', label: 'District' },
-      { key: 'isActive', label: 'Active', formatter: formatters.boolean },
-      { key: 'trainingsCount', label: 'Total Trainings', formatter: formatters.number },
-      { key: 'activeTrainingsCount', label: 'Active Trainings', formatter: formatters.number },
-      { key: 'createdAt', label: 'Created Date', formatter: formatters.date },
-    ]
-
-    exportToCSV(locationsToExport, columns, 'training_locations')
-    toast.success(`Exported ${locationsToExport.length} locations`)
-  }
-
-  const handleExportStacks = () => {
-    const stacksToExport = selectedStacks.length > 0 
-      ? filteredStacks.filter(stack => selectedStacks.includes(stack.id))
-      : filteredStacks
-
-    const columns = [
-      { key: 'name', label: 'Name' },
-      { key: 'description', label: 'Description' },
-      { key: 'trainingsCount', label: 'Total Trainings', formatter: formatters.number },
-      { key: 'activeTrainingsCount', label: 'Active Trainings', formatter: formatters.number },
-      { key: 'createdAt', label: 'Created Date', formatter: formatters.date },
-    ]
-
-    exportToCSV(stacksToExport, columns, 'stacks')
-    toast.success(`Exported ${stacksToExport.length} stacks`)
-  }
-
-  if (status === "loading" || !session || session.user.role !== "ADMIN") {
+  if (status === "loading") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -664,6 +646,10 @@ export default function AdminTrainingsPage() {
         </div>
       </div>
     )
+  }
+
+  if (!session || session.user.role !== "ADMIN") {
+    return null
   }
 
   const user = session.user
@@ -675,67 +661,26 @@ export default function AdminTrainingsPage() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold">Training Management</h1>
-            <p className="text-muted-foreground">Manage training categories, locations, and stacks</p>
+            <p className="text-muted-foreground">Manage training categories, locations, stacks, and postings</p>
           </div>
+          <Button onClick={() => {
+            fetchCategories()
+            fetchLocations()
+            fetchStacks()
+            fetchTrainings()
+          }}>
+            <Settings className="h-4 w-4 mr-2" />
+            Refresh All
+          </Button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Categories</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {categoriesLoading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <div className="text-2xl font-bold">{categories.length}</div>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Locations</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {locationsLoading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <div className="text-2xl font-bold">{locations.length}</div>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Stacks</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {stacksLoading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <div className="text-2xl font-bold">{stacks.length}</div>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Trainings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {categoriesLoading || locationsLoading || stacksLoading ? (
-                <Skeleton className="h-8 w-16" />
-              ) : (
-                <div className="text-2xl font-bold">
-                  {categories.reduce((sum, cat) => sum + cat.trainingsCount, 0)}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Tabs */}
-        <Tabs defaultValue="categories" className="space-y-4">
-          <TabsList>
+        {/* Main Tabs */}
+        <Tabs defaultValue="trainings" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="trainings" className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              Training Postings
+            </TabsTrigger>
             <TabsTrigger value="categories" className="flex items-center gap-2">
               <FolderOpen className="h-4 w-4" />
               Categories
@@ -745,19 +690,255 @@ export default function AdminTrainingsPage() {
               Locations
             </TabsTrigger>
             <TabsTrigger value="stacks" className="flex items-center gap-2">
-              <Grid3X3 className="h-4 w-4" />
+              <Code className="h-4 w-4" />
               Stacks
             </TabsTrigger>
           </TabsList>
+
+          {/* Training Postings Tab */}
+          <TabsContent value="trainings" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5" />
+                  Training Postings
+                </CardTitle>
+                <CardDescription>
+                  Manage all training postings, their status, and assignments
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Search and Filters */}
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search trainings..."
+                      value={trainingSearchTerm}
+                      onChange={(e) => setTrainingSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Select value={trainingTypeFilter} onValueChange={setTrainingTypeFilter}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All Types</SelectItem>
+                      <SelectItem value="CORPORATE">Corporate</SelectItem>
+                      <SelectItem value="UNIVERSITY">University</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={trainingStatusFilter} onValueChange={setTrainingStatusFilter}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All Status</SelectItem>
+                      <SelectItem value="ACTIVE">Active</SelectItem>
+                      <SelectItem value="INACTIVE">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Bulk Actions */}
+                {selectedTrainings.length > 0 && (
+                  <BulkActions
+                    selectedCount={selectedTrainings.length}
+                    actions={[
+                      { label: "Activate", value: "activate", icon: CheckCircle },
+                      { label: "Deactivate", value: "deactivate", icon: XCircle },
+                      { label: "Publish", value: "publish", icon: Eye },
+                      { label: "Unpublish", value: "unpublish", icon: EyeOff },
+                      { label: "Delete", value: "delete", icon: Trash2, variant: "destructive" as const },
+                    ]}
+                    onAction={(action) => handleTrainingAction(selectedTrainings, action)}
+                    onClearSelection={() => {
+                      setSelectedTrainings([])
+                      setIsTrainingSelectAll(false)
+                    }}
+                  />
+                )}
+
+                {/* Trainings Table */}
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">
+                          <Checkbox
+                            checked={isTrainingSelectAll}
+                            onCheckedChange={handleSelectAllTrainings}
+                          />
+                        </TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Organization</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead>Payment</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {trainingsLoading ? (
+                        Array.from({ length: 5 }).map((_, index) => (
+                          <TableRow key={index}>
+                            <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : filteredTrainings.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={10} className="text-center py-8">
+                            <p className="text-muted-foreground">No trainings found</p>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredTrainings.map((training) => (
+                          <TableRow key={training.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedTrainings.includes(training.id)}
+                                onCheckedChange={(checked) => handleSelectTraining(training.id, checked as boolean)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{training.title}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {training.skills.slice(0, 2).join(", ")}
+                                  {training.skills.length > 2 && "..."}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Building className="h-4 w-4 text-muted-foreground" />
+                                {training.organization.organizationName}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{training.category.name}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={training.type === "CORPORATE" ? "default" : "secondary"}>
+                                {training.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-sm">
+                                  {training.location.state}, {training.location.district}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                {new Date(training.startDate).toLocaleDateString()} - {new Date(training.endDate).toLocaleDateString()}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm font-medium">
+                                ${training.paymentAmount.toLocaleString()}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {training.paymentTerm} days
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Badge variant={training.isActive ? "default" : "secondary"}>
+                                  {training.isActive ? "Active" : "Inactive"}
+                                </Badge>
+                                <Badge variant={training.isPublished ? "default" : "outline"}>
+                                  {training.isPublished ? "Published" : "Draft"}
+                                </Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="h-8 w-8 p-0">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => router.push(`/trainings/${training.id}`)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleTrainingAction([training.id], training.isActive ? "deactivate" : "activate")}>
+                                    {training.isActive ? <XCircle className="h-4 w-4 mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                                    {training.isActive ? "Deactivate" : "Activate"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleTrainingAction([training.id], training.isPublished ? "unpublish" : "publish")}>
+                                    {training.isPublished ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                                    {training.isPublished ? "Unpublish" : "Publish"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleTrainingAction([training.id], "delete")}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Categories Tab */}
           <TabsContent value="categories" className="space-y-4">
             <Card>
               <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FolderOpen className="h-5 w-5" />
+                  Training Categories
+                </CardTitle>
+                <CardDescription>
+                  Manage training categories and their classifications
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Add Category Button */}
                 <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle>Training Categories</CardTitle>
-                    <CardDescription>Manage training categories for the platform</CardDescription>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Search categories..."
+                      value={categorySearchTerm}
+                      onChange={(e) => setCategorySearchTerm(e.target.value)}
+                      className="w-[300px]"
+                    />
+                    <Select value={categoryActiveFilter} onValueChange={setCategoryActiveFilter}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All Status</SelectItem>
+                        <SelectItem value="true">Active</SelectItem>
+                        <SelectItem value="false">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
                     <DialogTrigger asChild>
@@ -766,16 +947,13 @@ export default function AdminTrainingsPage() {
                         Add Category
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
+                    <DialogContent>
                       <DialogHeader>
                         <DialogTitle>
                           {editingCategory ? "Edit Category" : "Add New Category"}
                         </DialogTitle>
                         <DialogDescription>
-                          {editingCategory 
-                            ? "Update the training category information."
-                            : "Create a new training category for the platform."
-                          }
+                          {editingCategory ? "Update the category details" : "Create a new training category"}
                         </DialogDescription>
                       </DialogHeader>
                       <Form {...categoryForm}>
@@ -787,10 +965,7 @@ export default function AdminTrainingsPage() {
                               <FormItem>
                                 <FormLabel>Name</FormLabel>
                                 <FormControl>
-                                  <Input 
-                                    placeholder="e.g., FRAMEWORKS" 
-                                    {...field} 
-                                  />
+                                  <Input placeholder="Category name" {...field} />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -803,10 +978,7 @@ export default function AdminTrainingsPage() {
                               <FormItem>
                                 <FormLabel>Description</FormLabel>
                                 <FormControl>
-                                  <Textarea 
-                                    placeholder="Describe this training category..." 
-                                    {...field} 
-                                  />
+                                  <Textarea placeholder="Category description" {...field} />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -816,11 +988,11 @@ export default function AdminTrainingsPage() {
                             control={categoryForm.control}
                             name="isActive"
                             render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                                 <div className="space-y-0.5">
-                                  <FormLabel>Active</FormLabel>
+                                  <FormLabel>Active Status</FormLabel>
                                   <FormDescription>
-                                    Enable this category to be visible in the platform
+                                    Enable or disable this category
                                   </FormDescription>
                                 </div>
                                 <FormControl>
@@ -833,19 +1005,8 @@ export default function AdminTrainingsPage() {
                             )}
                           />
                           <DialogFooter>
-                            <Button 
-                              type="button" 
-                              variant="outline" 
-                              onClick={() => {
-                                setIsCategoryDialogOpen(false)
-                                setEditingCategory(null)
-                                categoryForm.reset()
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                            <Button type="submit" disabled={isPending}>
-                              {isPending ? "Saving..." : (editingCategory ? "Update" : "Save")}
+                            <Button type="submit" disabled={categoryForm.formState.isSubmitting}>
+                              {categoryForm.formState.isSubmitting ? "Saving..." : "Save Category"}
                             </Button>
                           </DialogFooter>
                         </form>
@@ -853,139 +1014,97 @@ export default function AdminTrainingsPage() {
                     </DialogContent>
                   </Dialog>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Bulk Actions */}
-                  <BulkActions
-                    selectedItems={selectedCategories}
-                    totalItems={categories.length}
-                    filteredItems={filteredCategories}
-                    onSelectAll={handleSelectAllCategories}
-                    onSelectItem={handleSelectCategory}
-                    onBulkAction={handleBulkCategoryAction}
-                    onExport={handleExportCategories}
-                    actionOptions={[
-                      commonBulkActions.activate,
-                      commonBulkActions.deactivate,
-                      commonBulkActions.delete,
-                    ]}
-                    itemName="categories"
-                    isSelectAll={isCategorySelectAll}
-                    loading={categoriesLoading}
-                  />
 
-                  {/* Search and Filter */}
-                  <div className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Search categories..."
-                          value={categorySearchTerm}
-                          onChange={(e) => setCategorySearchTerm(e.target.value)}
-                          className="pl-10"
-                        />
-                      </div>
-                    </div>
-                    <Select value={categoryActiveFilter} onValueChange={setCategoryActiveFilter}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Filter by status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ALL">All Status</SelectItem>
-                        <SelectItem value="true">Active</SelectItem>
-                        <SelectItem value="false">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Categories Table */}
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
+                {/* Categories Table */}
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">
+                          <Checkbox
+                            checked={isCategorySelectAll}
+                            onCheckedChange={handleSelectAllCategories}
+                          />
+                        </TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Trainings</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {categoriesLoading ? (
+                        Array.from({ length: 5 }).map((_, index) => (
+                          <TableRow key={index}>
+                            <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : filteredCategories.length === 0 ? (
                         <TableRow>
-                          <TableHead className="w-[50px]">
-                            <Checkbox
-                              checked={isCategorySelectAll}
-                              onCheckedChange={handleSelectAllCategories}
-                              aria-label="Select all categories"
-                            />
-                          </TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Trainings</TableHead>
-                          <TableHead>Created</TableHead>
-                          <TableHead className="w-[100px]">Actions</TableHead>
+                          <TableCell colSpan={7} className="text-center py-8">
+                            <p className="text-muted-foreground">No categories found</p>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {categoriesLoading ? (
-                          Array.from({ length: 5 }).map((_, index) => (
-                            <TableRow key={index}>
-                              <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                            </TableRow>
-                          ))
-                        ) : filteredCategories.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                              No categories found matching your search.
+                      ) : (
+                        filteredCategories.map((category) => (
+                          <TableRow key={category.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedCategories.includes(category.id)}
+                                onCheckedChange={(checked) => handleSelectCategory(category.id, checked as boolean)}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">{category.name}</TableCell>
+                            <TableCell className="max-w-xs truncate">{category.description}</TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <div>{category.trainingsCount} total</div>
+                                <div className="text-muted-foreground">{category.activeTrainingsCount} active</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={category.isActive ? "default" : "secondary"}>
+                                {category.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {new Date(category.createdAt).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="h-8 w-8 p-0">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEditCategory(category)}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDeleteCategory(category.id)}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
-                        ) : (
-                          filteredCategories.map((category) => (
-                            <TableRow key={category.id}>
-                              <TableCell>
-                                <RowCheckbox
-                                  itemId={category.id}
-                                  isSelected={selectedCategories.includes(category.id)}
-                                  onSelect={handleSelectCategory}
-                                />
-                              </TableCell>
-                              <TableCell className="font-medium">{category.name}</TableCell>
-                              <TableCell className="max-w-xs truncate">{category.description}</TableCell>
-                              <TableCell>
-                                <Badge variant={category.isActive ? "default" : "secondary"}>
-                                  {category.isActive ? "Active" : "Inactive"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>{category.trainingsCount}</TableCell>
-                              <TableCell>{new Date(category.createdAt).toLocaleDateString()}</TableCell>
-                              <TableCell>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="h-8 w-8 p-0">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleEditCategory(category)}>
-                                      <Edit className="h-4 w-4 mr-2" />
-                                      Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem 
-                                      onClick={() => handleDeleteCategory(category.id)}
-                                      className="text-red-600"
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
             </Card>
@@ -995,10 +1114,34 @@ export default function AdminTrainingsPage() {
           <TabsContent value="locations" className="space-y-4">
             <Card>
               <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  Training Locations
+                </CardTitle>
+                <CardDescription>
+                  Manage training locations by state and district
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Add Location Button */}
                 <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle>Training Locations</CardTitle>
-                    <CardDescription>Manage training locations (states and districts)</CardDescription>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Search locations..."
+                      value={locationSearchTerm}
+                      onChange={(e) => setLocationSearchTerm(e.target.value)}
+                      className="w-[300px]"
+                    />
+                    <Select value={locationActiveFilter} onValueChange={setLocationActiveFilter}>
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All Status</SelectItem>
+                        <SelectItem value="true">Active</SelectItem>
+                        <SelectItem value="false">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <Dialog open={isLocationDialogOpen} onOpenChange={setIsLocationDialogOpen}>
                     <DialogTrigger asChild>
@@ -1007,16 +1150,13 @@ export default function AdminTrainingsPage() {
                         Add Location
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
+                    <DialogContent>
                       <DialogHeader>
                         <DialogTitle>
                           {editingLocation ? "Edit Location" : "Add New Location"}
                         </DialogTitle>
                         <DialogDescription>
-                          {editingLocation 
-                            ? "Update the training location information."
-                            : "Create a new training location for the platform."
-                          }
+                          {editingLocation ? "Update the location details" : "Create a new training location"}
                         </DialogDescription>
                       </DialogHeader>
                       <Form {...locationForm}>
@@ -1028,10 +1168,7 @@ export default function AdminTrainingsPage() {
                               <FormItem>
                                 <FormLabel>State</FormLabel>
                                 <FormControl>
-                                  <Input 
-                                    placeholder="e.g., Karnataka" 
-                                    {...field} 
-                                  />
+                                  <Input placeholder="State name" {...field} />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -1044,10 +1181,7 @@ export default function AdminTrainingsPage() {
                               <FormItem>
                                 <FormLabel>District</FormLabel>
                                 <FormControl>
-                                  <Input 
-                                    placeholder="e.g., Bangalore" 
-                                    {...field} 
-                                  />
+                                  <Input placeholder="District name" {...field} />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -1057,11 +1191,11 @@ export default function AdminTrainingsPage() {
                             control={locationForm.control}
                             name="isActive"
                             render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                                 <div className="space-y-0.5">
-                                  <FormLabel>Active</FormLabel>
+                                  <FormLabel>Active Status</FormLabel>
                                   <FormDescription>
-                                    Enable this location to be visible in the platform
+                                    Enable or disable this location
                                   </FormDescription>
                                 </div>
                                 <FormControl>
@@ -1074,19 +1208,8 @@ export default function AdminTrainingsPage() {
                             )}
                           />
                           <DialogFooter>
-                            <Button 
-                              type="button" 
-                              variant="outline" 
-                              onClick={() => {
-                                setIsLocationDialogOpen(false)
-                                setEditingLocation(null)
-                                locationForm.reset()
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                            <Button type="submit" disabled={isPending}>
-                              {isPending ? "Saving..." : (editingLocation ? "Update" : "Save")}
+                            <Button type="submit" disabled={locationForm.formState.isSubmitting}>
+                              {locationForm.formState.isSubmitting ? "Saving..." : "Save Location"}
                             </Button>
                           </DialogFooter>
                         </form>
@@ -1094,139 +1217,97 @@ export default function AdminTrainingsPage() {
                     </DialogContent>
                   </Dialog>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Bulk Actions */}
-                  <BulkActions
-                    selectedItems={selectedLocations}
-                    totalItems={locations.length}
-                    filteredItems={filteredLocations}
-                    onSelectAll={handleSelectAllLocations}
-                    onSelectItem={handleSelectLocation}
-                    onBulkAction={handleBulkLocationAction}
-                    onExport={handleExportLocations}
-                    actionOptions={[
-                      commonBulkActions.activate,
-                      commonBulkActions.deactivate,
-                      commonBulkActions.delete,
-                    ]}
-                    itemName="locations"
-                    isSelectAll={isLocationSelectAll}
-                    loading={locationsLoading}
-                  />
 
-                  {/* Search and Filter */}
-                  <div className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Search locations..."
-                          value={locationSearchTerm}
-                          onChange={(e) => setLocationSearchTerm(e.target.value)}
-                          className="pl-10"
-                        />
-                      </div>
-                    </div>
-                    <Select value={locationActiveFilter} onValueChange={setLocationActiveFilter}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Filter by status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ALL">All Status</SelectItem>
-                        <SelectItem value="true">Active</SelectItem>
-                        <SelectItem value="false">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Locations Table */}
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
+                {/* Locations Table */}
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">
+                          <Checkbox
+                            checked={isLocationSelectAll}
+                            onCheckedChange={handleSelectAllLocations}
+                          />
+                        </TableHead>
+                        <TableHead>State</TableHead>
+                        <TableHead>District</TableHead>
+                        <TableHead>Trainings</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {locationsLoading ? (
+                        Array.from({ length: 5 }).map((_, index) => (
+                          <TableRow key={index}>
+                            <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : filteredLocations.length === 0 ? (
                         <TableRow>
-                          <TableHead className="w-[50px]">
-                            <Checkbox
-                              checked={isLocationSelectAll}
-                              onCheckedChange={handleSelectAllLocations}
-                              aria-label="Select all locations"
-                            />
-                          </TableHead>
-                          <TableHead>State</TableHead>
-                          <TableHead>District</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Trainings</TableHead>
-                          <TableHead>Created</TableHead>
-                          <TableHead className="w-[100px]">Actions</TableHead>
+                          <TableCell colSpan={7} className="text-center py-8">
+                            <p className="text-muted-foreground">No locations found</p>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {locationsLoading ? (
-                          Array.from({ length: 5 }).map((_, index) => (
-                            <TableRow key={index}>
-                              <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                            </TableRow>
-                          ))
-                        ) : filteredLocations.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                              No locations found matching your search.
+                      ) : (
+                        filteredLocations.map((location) => (
+                          <TableRow key={location.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedLocations.includes(location.id)}
+                                onCheckedChange={(checked) => handleSelectLocation(location.id, checked as boolean)}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">{location.state}</TableCell>
+                            <TableCell>{location.district}</TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <div>{location.trainingsCount} total</div>
+                                <div className="text-muted-foreground">{location.activeTrainingsCount} active</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={location.isActive ? "default" : "secondary"}>
+                                {location.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {new Date(location.createdAt).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="h-8 w-8 p-0">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEditLocation(location)}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDeleteLocation(location.id)}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
-                        ) : (
-                          filteredLocations.map((location) => (
-                            <TableRow key={location.id}>
-                              <TableCell>
-                                <RowCheckbox
-                                  itemId={location.id}
-                                  isSelected={selectedLocations.includes(location.id)}
-                                  onSelect={handleSelectLocation}
-                                />
-                              </TableCell>
-                              <TableCell className="font-medium">{location.state}</TableCell>
-                              <TableCell>{location.district}</TableCell>
-                              <TableCell>
-                                <Badge variant={location.isActive ? "default" : "secondary"}>
-                                  {location.isActive ? "Active" : "Inactive"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>{location.trainingsCount}</TableCell>
-                              <TableCell>{new Date(location.createdAt).toLocaleDateString()}</TableCell>
-                              <TableCell>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="h-8 w-8 p-0">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleEditLocation(location)}>
-                                      <Edit className="h-4 w-4 mr-2" />
-                                      Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem 
-                                      onClick={() => handleDeleteLocation(location.id)}
-                                      className="text-red-600"
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
             </Card>
@@ -1236,11 +1317,23 @@ export default function AdminTrainingsPage() {
           <TabsContent value="stacks" className="space-y-4">
             <Card>
               <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Code className="h-5 w-5" />
+                  Technology Stacks
+                </CardTitle>
+                <CardDescription>
+                  Manage technology stacks and frameworks
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Add Stack Button */}
                 <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle>Stacks & Frameworks</CardTitle>
-                    <CardDescription>Manage technology stacks and frameworks</CardDescription>
-                  </div>
+                  <Input
+                    placeholder="Search stacks..."
+                    value={stackSearchTerm}
+                    onChange={(e) => setStackSearchTerm(e.target.value)}
+                    className="w-[300px]"
+                  />
                   <Dialog open={isStackDialogOpen} onOpenChange={setIsStackDialogOpen}>
                     <DialogTrigger asChild>
                       <Button>
@@ -1248,16 +1341,13 @@ export default function AdminTrainingsPage() {
                         Add Stack
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
+                    <DialogContent>
                       <DialogHeader>
                         <DialogTitle>
                           {editingStack ? "Edit Stack" : "Add New Stack"}
                         </DialogTitle>
                         <DialogDescription>
-                          {editingStack 
-                            ? "Update the stack information."
-                            : "Create a new technology stack or framework."
-                          }
+                          {editingStack ? "Update the stack details" : "Create a new technology stack"}
                         </DialogDescription>
                       </DialogHeader>
                       <Form {...stackForm}>
@@ -1269,10 +1359,7 @@ export default function AdminTrainingsPage() {
                               <FormItem>
                                 <FormLabel>Name</FormLabel>
                                 <FormControl>
-                                  <Input 
-                                    placeholder="e.g., React.js" 
-                                    {...field} 
-                                  />
+                                  <Input placeholder="Stack name" {...field} />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -1285,29 +1372,15 @@ export default function AdminTrainingsPage() {
                               <FormItem>
                                 <FormLabel>Description</FormLabel>
                                 <FormControl>
-                                  <Textarea 
-                                    placeholder="Describe this technology stack..." 
-                                    {...field} 
-                                  />
+                                  <Textarea placeholder="Stack description (optional)" {...field} />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
                           <DialogFooter>
-                            <Button 
-                              type="button" 
-                              variant="outline" 
-                              onClick={() => {
-                                setIsStackDialogOpen(false)
-                                setEditingStack(null)
-                                stackForm.reset()
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                            <Button type="submit" disabled={isPending}>
-                              {isPending ? "Saving..." : (editingStack ? "Update" : "Save")}
+                            <Button type="submit" disabled={stackForm.formState.isSubmitting}>
+                              {stackForm.formState.isSubmitting ? "Saving..." : "Save Stack"}
                             </Button>
                           </DialogFooter>
                         </form>
@@ -1315,118 +1388,90 @@ export default function AdminTrainingsPage() {
                     </DialogContent>
                   </Dialog>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Bulk Actions */}
-                  <BulkActions
-                    selectedItems={selectedStacks}
-                    totalItems={stacks.length}
-                    filteredItems={filteredStacks}
-                    onSelectAll={handleSelectAllStacks}
-                    onSelectItem={handleSelectStack}
-                    onBulkAction={handleBulkStackAction}
-                    onExport={handleExportStacks}
-                    actionOptions={[
-                      commonBulkActions.delete,
-                    ]}
-                    itemName="stacks"
-                    isSelectAll={isStackSelectAll}
-                    loading={stacksLoading}
-                  />
 
-                  {/* Search */}
-                  <div className="flex-1">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search stacks..."
-                        value={stackSearchTerm}
-                        onChange={(e) => setStackSearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Stacks Table */}
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
+                {/* Stacks Table */}
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">
+                          <Checkbox
+                            checked={isStackSelectAll}
+                            onCheckedChange={handleSelectAllStacks}
+                          />
+                        </TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Trainings</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {stacksLoading ? (
+                        Array.from({ length: 5 }).map((_, index) => (
+                          <TableRow key={index}>
+                            <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : filteredStacks.length === 0 ? (
                         <TableRow>
-                          <TableHead className="w-[50px]">
-                            <Checkbox
-                              checked={isStackSelectAll}
-                              onCheckedChange={handleSelectAllStacks}
-                              aria-label="Select all stacks"
-                            />
-                          </TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Trainings</TableHead>
-                          <TableHead>Created</TableHead>
-                          <TableHead className="w-[100px]">Actions</TableHead>
+                          <TableCell colSpan={6} className="text-center py-8">
+                            <p className="text-muted-foreground">No stacks found</p>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {stacksLoading ? (
-                          Array.from({ length: 5 }).map((_, index) => (
-                            <TableRow key={index}>
-                              <TableCell><Skeleton className="h-4 w-4" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                              <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                            </TableRow>
-                          ))
-                        ) : filteredStacks.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                              No stacks found matching your search.
+                      ) : (
+                        filteredStacks.map((stack) => (
+                          <TableRow key={stack.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedStacks.includes(stack.id)}
+                                onCheckedChange={(checked) => handleSelectStack(stack.id, checked as boolean)}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">{stack.name}</TableCell>
+                            <TableCell className="max-w-xs truncate">{stack.description || "No description"}</TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <div>{stack.trainingsCount} total</div>
+                                <div className="text-muted-foreground">{stack.activeTrainingsCount} active</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {new Date(stack.createdAt).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="h-8 w-8 p-0">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleEditStack(stack)}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDeleteStack(stack.id)}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
-                        ) : (
-                          filteredStacks.map((stack) => (
-                            <TableRow key={stack.id}>
-                              <TableCell>
-                                <RowCheckbox
-                                  itemId={stack.id}
-                                  isSelected={selectedStacks.includes(stack.id)}
-                                  onSelect={handleSelectStack}
-                                />
-                              </TableCell>
-                              <TableCell className="font-medium">{stack.name}</TableCell>
-                              <TableCell className="max-w-xs truncate">{stack.description}</TableCell>
-                              <TableCell>{stack.trainingsCount}</TableCell>
-                              <TableCell>{new Date(stack.createdAt).toLocaleDateString()}</TableCell>
-                              <TableCell>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" className="h-8 w-8 p-0">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleEditStack(stack)}>
-                                      <Edit className="h-4 w-4 mr-2" />
-                                      Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem 
-                                      onClick={() => handleDeleteStack(stack.id)}
-                                      className="text-red-600"
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
             </Card>
