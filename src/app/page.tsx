@@ -120,7 +120,7 @@ export default function LoginPage() {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="text-center mb-8"
         >
-          <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <Users className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">Atom Connect</h1>
