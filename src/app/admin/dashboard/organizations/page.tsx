@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Checkbox } from "@/components/ui/checkbox"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Search, Filter, Download, MoreHorizontal, Eye, Edit, Trash2, Building, CheckCircle, XCircle, Clock } from "lucide-react"
+import HexagonLoader from "@/components/ui/hexagon-loader"
 import { toast } from "sonner"
 import { VerificationStatus, ActiveStatus } from "@prisma/client"
 import {
@@ -354,7 +355,7 @@ export default function AdminOrganizationsPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <HexagonLoader size={64} className="mx-auto mb-4" />
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>

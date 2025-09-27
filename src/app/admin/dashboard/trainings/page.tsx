@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, Search, Edit, Trash2, MoreHorizontal, Settings, Download, Upload, MapPin, Code, FolderOpen, Grid3X3 } from "lucide-react"
+import HexagonLoader from "@/components/ui/hexagon-loader"
 import { toast } from "sonner"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -658,7 +659,7 @@ export default function AdminTrainingsPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <HexagonLoader size={64} className="mx-auto mb-4" />
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>

@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { ResetPasswordDialog } from "@/components/auth/ResetPasswordDialog"
 import { User, Key, Mail, Phone, CheckCircle, AlertCircle, Save } from "lucide-react"
+import HexagonLoader from "@/components/ui/hexagon-loader"
 
 export default function AdminAccountSettingsPage() {
   const { data: session, status } = useSession()
@@ -86,7 +87,7 @@ export default function AdminAccountSettingsPage() {
     return (
       <DashboardLayout userRole="ADMIN" userName="Loading...">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <HexagonLoader size={32} />
         </div>
       </DashboardLayout>
     )
@@ -186,7 +187,7 @@ export default function AdminAccountSettingsPage() {
                   <Button onClick={handleSave} disabled={saving}>
                     {saving ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                        <HexagonLoader size={16} className="mr-2" />
                         Saving...
                       </>
                     ) : (
