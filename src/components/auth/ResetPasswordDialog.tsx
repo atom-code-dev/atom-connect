@@ -9,29 +9,23 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel as FormFormFieldLabel, FormMessage } from "@/components/ui/form"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Key, Mail, CheckCircle, AlertCircle } from "lucide-react"
+import { Key, CheckCircle, AlertCircle } from "lucide-react"
 
-// Form schemas
-const RequestResetSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  role: z.enum(["ADMIN", "FREELANCER", "ORGANIZATION", "MAINTAINER"], {
-    required_error: "Please select a role"
-  })
-})
-
+// Form schema
 const ResetPasswordSchema = z.object({
-  token: z.string().min(1, "Reset token is required"),
+  currentPassword: z.string().min(1, "Current password is required"),
   newPassword: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string().min(6, "Password must be at least 6 characters")
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"]
+}).refine((data) => data.currentPassword !== data.newPassword, {
+  message: "New password must be different from current password",
+  path: ["newPassword"]
 })
 
-type RequestResetForm = z.infer<typeof RequestResetSchema>
 type ResetPasswordForm = z.infer<typeof ResetPasswordSchema>
 
 interface ResetPasswordDialogProps {
@@ -40,77 +34,25 @@ interface ResetPasswordDialogProps {
 
 export function ResetPasswordDialog({ children }: ResetPasswordDialogProps) {
   const [open, setOpen] = useState(false)
-  const [step, setStep] = useState<"request" | "reset" | "success">("request")
+  const [step, setStep] = useState<"reset" | "success">("reset")
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error", text: string } | null>(null)
-
-  const requestForm = useForm<RequestResetForm>({
-    resolver: zodResolver(RequestResetSchema),
-    defaultValues: {
-      email: "",
-      role: undefined
-    }
-  })
 
   const resetForm = useForm<ResetPasswordForm>({
     resolver: zodResolver(ResetPasswordSchema),
     defaultValues: {
-      token: "",
+      currentPassword: "",
       newPassword: "",
       confirmPassword: ""
     }
   })
-
-  const handleRequestReset = async (data: RequestResetForm) => {
-    setLoading(true)
-    setMessage(null)
-
-    try {
-      const response = await fetch("/api/auth/reset-password?action=request", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(data)
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        setMessage({
-          type: "success",
-          text: result.message
-        })
-        // For demo purposes, show the token
-        if (result.debugToken) {
-          setTimeout(() => {
-            alert(`For demo purposes, here is your reset token: ${result.debugToken}`)
-            resetForm.setValue("token", result.debugToken)
-            setStep("reset")
-          }, 1000)
-        }
-      } else {
-        setMessage({
-          type: "error",
-          text: result.message || "Failed to send reset email"
-        })
-      }
-    } catch (error) {
-      setMessage({
-        type: "error",
-        text: "An error occurred. Please try again."
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleResetPassword = async (data: ResetPasswordForm) => {
     setLoading(true)
     setMessage(null)
 
     try {
-      const response = await fetch("/api/auth/reset-password?action=reset", {
+      const response = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -140,9 +82,8 @@ export function ResetPasswordDialog({ children }: ResetPasswordDialogProps) {
 
   const handleClose = () => {
     setOpen(false)
-    setStep("request")
+    setStep("reset")
     setMessage(null)
-    requestForm.reset()
     resetForm.reset()
   }
 
@@ -158,8 +99,7 @@ export function ResetPasswordDialog({ children }: ResetPasswordDialogProps) {
             Reset Password
           </DialogTitle>
           <DialogDescription>
-            {step === "request" && "Enter your email and role to receive a password reset link."}
-            {step === "reset" && "Enter your reset token and new password."}
+            {step === "reset" && "Enter your current password and choose a new password."}
             {step === "success" && "Your password has been reset successfully!"}
           </DialogDescription>
         </DialogHeader>
@@ -177,78 +117,19 @@ export function ResetPasswordDialog({ children }: ResetPasswordDialogProps) {
           </Alert>
         )}
 
-        {step === "request" && (
-          <Form {...requestForm}>
-            <form onSubmit={requestForm.handleSubmit(handleRequestReset)} className="space-y-4">
-              <FormField
-                control={requestForm.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormFormFieldLabel>Email Address</FormFormFieldLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          placeholder="Enter your email"
-                          className="pl-10"
-                          {...field}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={requestForm.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormFormFieldLabel>Account Type</FormFormFieldLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select your account type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="ADMIN">Admin</SelectItem>
-                        <SelectItem value="FREELANCER">Freelancer</SelectItem>
-                        <SelectItem value="ORGANIZATION">Organization</SelectItem>
-                        <SelectItem value="MAINTAINER">Maintainer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={handleClose}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? "Sending..." : "Send Reset Link"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        )}
-
         {step === "reset" && (
           <Form {...resetForm}>
             <form onSubmit={resetForm.handleSubmit(handleResetPassword)} className="space-y-4">
               <FormField
                 control={resetForm.control}
-                name="token"
+                name="currentPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormFormFieldLabel>Reset Token</FormFormFieldLabel>
+                    <FormFormFieldLabel>Current Password</FormFormFieldLabel>
                     <FormControl>
                       <Input
-                        placeholder="Enter the reset token"
+                        type="password"
+                        placeholder="Enter your current password"
                         {...field}
                       />
                     </FormControl>
@@ -294,8 +175,8 @@ export function ResetPasswordDialog({ children }: ResetPasswordDialogProps) {
               />
 
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setStep("request")}>
-                  Back
+                <Button type="button" variant="outline" onClick={handleClose}>
+                  Cancel
                 </Button>
                 <Button type="submit" disabled={loading}>
                   {loading ? "Resetting..." : "Reset Password"}

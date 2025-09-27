@@ -2,125 +2,75 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import * as bcrypt from 'bcryptjs'
 import { z } from 'zod'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
-// Reset password request schema
+// Reset password schema
 const ResetPasswordSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  role: z.enum(['ADMIN', 'FREELANCER', 'ORGANIZATION', 'MAINTAINER'])
-})
-
-// Update password schema
-const UpdatePasswordSchema = z.object({
-  token: z.string().min(1, 'Token is required'),
+  currentPassword: z.string().min(1, 'Current password is required'),
   newPassword: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string().min(6, 'Password must be at least 6 characters')
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"]
+}).refine((data) => data.currentPassword !== data.newPassword, {
+  message: "New password must be different from current password",
+  path: ["newPassword"]
 })
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.email) {
+      return NextResponse.json({
+        message: 'Authentication required',
+        success: false
+      }, { status: 401 })
+    }
+
     const body = await request.json()
-    const { searchParams } = new URL(request.url)
-    const action = searchParams.get('action')
+    const validatedData = ResetPasswordSchema.parse(body)
 
-    if (action === 'request') {
-      // Handle password reset request
-      const validatedData = ResetPasswordSchema.parse(body)
-      
-      // Find user by email and role
-      const user = await db.user.findFirst({
-        where: {
-          email: validatedData.email,
-          role: validatedData.role
-        }
-      })
-
-      if (!user) {
-        // Return success even if user doesn't exist to prevent email enumeration
-        return NextResponse.json({
-          message: 'If an account with this email exists, you will receive a password reset link.',
-          success: true
-        })
+    // Find user by email
+    const user = await db.user.findUnique({
+      where: {
+        email: session.user.email
       }
+    })
 
-      // Generate a simple reset token (in production, use a more secure method)
-      const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-      const resetTokenExpiry = new Date(Date.now() + 3600000) // 1 hour from now
-
-      // Store the reset token in the user's profile (we'll use a simple approach)
-      // In a real application, you might want a separate table for reset tokens
-      await db.user.update({
-        where: { id: user.id },
-        data: {
-          // Store the reset token in the name field temporarily (for demo purposes)
-          // In production, you should add proper fields to the User model
-          name: `${user.name || ''}|${resetToken}|${resetTokenExpiry.getTime()}`
-        }
-      })
-
-      // In a real application, you would send an email with the reset link
-      // For demo purposes, we'll return the token directly
-      console.log(`Reset token for ${user.email}: ${resetToken}`)
-
+    if (!user) {
       return NextResponse.json({
-        message: 'If an account with this email exists, you will receive a password reset link.',
-        success: true,
-        // For demo purposes only - remove in production
-        debugToken: resetToken
-      })
+        message: 'User not found',
+        success: false
+      }, { status: 404 })
+    }
 
-    } else if (action === 'reset') {
-      // Handle password reset
-      const validatedData = UpdatePasswordSchema.parse(body)
-
-      // Find user by reset token
-      const users = await db.user.findMany()
-      let targetUser = null
-
-      for (const user of users) {
-        const nameParts = (user.name || '').split('|')
-        if (nameParts.length === 3 && nameParts[1] === validatedData.token) {
-          const expiryTime = parseInt(nameParts[2])
-          if (expiryTime > Date.now()) {
-            targetUser = user
-            break
-          }
-        }
-      }
-
-      if (!targetUser) {
-        return NextResponse.json({
-          message: 'Invalid or expired reset token',
-          success: false
-        }, { status: 400 })
-      }
-
-      // Hash the new password
-      const hashedPassword = await bcrypt.hash(validatedData.newPassword, 10)
-
-      // Update user password and clear reset token
-      const originalName = (targetUser.name || '').split('|')[0]
-      await db.user.update({
-        where: { id: targetUser.id },
-        data: {
-          password: hashedPassword,
-          name: originalName || targetUser.name
-        }
-      })
-
+    // Verify current password
+    const isCurrentPasswordValid = await bcrypt.compare(validatedData.currentPassword, user.password)
+    
+    if (!isCurrentPasswordValid) {
       return NextResponse.json({
-        message: 'Password has been reset successfully',
-        success: true
-      })
-
-    } else {
-      return NextResponse.json({
-        message: 'Invalid action',
+        message: 'Current password is incorrect',
         success: false
       }, { status: 400 })
     }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(validatedData.newPassword, 10)
+
+    // Update user password
+    await db.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword
+      }
+    })
+
+    return NextResponse.json({
+      message: 'Password has been reset successfully',
+      success: true
+    })
 
   } catch (error) {
     console.error('Password reset error:', error)
