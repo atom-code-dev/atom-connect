@@ -40,7 +40,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Generate monthly data for the last 12 months
-    const monthlyData = []
+    const monthlyData: Array<{
+      month: string;
+      totalReviews: number;
+      approvedReviews: number;
+      rejectedReviews: number;
+      pendingReviews: number;
+    }> = []
     const currentDate = new Date(startDate)
     
     for (let i = 0; i < 12; i++) {
@@ -88,7 +94,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Get review history - only approved organizations (no freelancer approvals needed)
-    const reviewHistory = []
+    const reviewHistory: Array<{
+      id: string;
+      type: "ORGANIZATION";
+      entityName: string;
+      status: string;
+      reviewedBy: string;
+      reviewedAt: string;
+      comments: string;
+    }> = []
     
     // Get approved organizations as review history
     const approvedOrganizations = await db.organizationProfile.findMany({

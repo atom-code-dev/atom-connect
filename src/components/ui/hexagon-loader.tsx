@@ -13,7 +13,7 @@ export default function HexagonLoader({ size = 80, className = "" }: { size?: nu
     const innerRadius = Number((size / 5).toFixed(2))
 
     const createHexagonPath = (radius: number, centerX: number, centerY: number) => {
-        const points = []
+        const points: string[] = []
         for (let i = 0; i < 6; i++) {
             const angle = (i * Math.PI) / 3
             const x = centerX + radius * Math.cos(angle)

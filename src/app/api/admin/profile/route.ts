@@ -127,7 +127,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({
         success: false,
         message: 'Validation error',
-        errors: error.errors
+        errors: error.issues
       }, { status: 400 })
     }
 

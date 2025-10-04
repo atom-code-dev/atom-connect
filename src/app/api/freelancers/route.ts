@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
           : 0
         
         // Parse skills if it's a string
-        let skills = []
+        let skills: any[] = []
         try {
           if (freelancer.skills && typeof freelancer.skills === 'string') {
             skills = JSON.parse(freelancer.skills)

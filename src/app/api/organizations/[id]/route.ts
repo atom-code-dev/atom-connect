@@ -185,7 +185,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     // Delete the organization and associated user
     await db.organizationProfile.delete({
-      where: { id: params.id }
+      where: { id }
     })
 
     // Also delete the user account

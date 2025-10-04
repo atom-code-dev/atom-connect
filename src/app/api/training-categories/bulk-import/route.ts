@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
 
     let importedCount = 0
     let skippedCount = 0
-    const errors = []
+    const errors: string[] = []
 
     for (const categoryData of categories) {
       try {
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
         importedCount++
       } catch (error) {
         if (error instanceof z.ZodError) {
-          errors.push(`Invalid data for category "${categoryData.name}": ${error.errors[0].message}`)
+          errors.push(`Invalid data for category "${categoryData.name}": ${error.issues[0].message}`)
         } else {
           errors.push(`Failed to import category "${categoryData.name}": ${error instanceof Error ? error.message : 'Unknown error'}`)
         }

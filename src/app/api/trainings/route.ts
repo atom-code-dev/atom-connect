@@ -116,6 +116,7 @@ export async function POST(request: NextRequest) {
       experienceMax,
       openings,
       tfa,
+      trainerPreference,
       startDate,
       endDate,
       hasPayment,
@@ -127,9 +128,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    let organizationId = null
+    let organizationId: string | null = null
     let companyName = "Admin"
-    let companyLogo = "/logo.png" // Default app logo
+    let companyLogo: string | null = "/logo.png" // Default app logo
 
     // If user is organization, get their profile
     if (session.user.role === 'ORGANIZATION') {
@@ -213,7 +214,7 @@ export async function POST(request: NextRequest) {
         hasPayment: hasPayment || false,
         paymentTerm: hasPayment ? (paymentTerm ? parseInt(paymentTerm) : null) : null,
         paymentAmount: hasPayment ? (paymentAmount ? parseFloat(paymentAmount) : null) : null,
-        organizationId,
+        organizationId: organizationId!,
       },
       include: {
         category: true,

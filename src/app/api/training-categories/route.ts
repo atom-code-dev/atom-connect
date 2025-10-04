@@ -94,8 +94,7 @@ export async function POST(request: NextRequest) {
     const category = await db.trainingCategory.create({
       data: {
         name,
-        description,
-        isActive
+        description
       },
       include: {
         trainings: {
@@ -161,8 +160,7 @@ export async function PUT(request: NextRequest) {
       where: { id },
       data: {
         name,
-        description,
-        isActive
+        description
       },
       include: {
         trainings: {
@@ -203,26 +201,12 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid category IDs' }, { status: 400 })
     }
 
-    const validActions = ['activate', 'deactivate', 'delete']
+    const validActions = ['delete']
     if (!validActions.includes(action)) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
 
     switch (action) {
-      case 'activate':
-        await db.trainingCategory.updateMany({
-          where: { id: { in: categoryIds } },
-          data: { isActive: true }
-        })
-        break
-
-      case 'deactivate':
-        await db.trainingCategory.updateMany({
-          where: { id: { in: categoryIds } },
-          data: { isActive: false }
-        })
-        break
-
       case 'delete':
         // Check if categories have associated trainings
         const categoriesWithTrainings = await db.trainingCategory.findMany({
@@ -242,6 +226,9 @@ export async function PATCH(request: NextRequest) {
           where: { id: { in: categoryIds } }
         })
         break
+
+      default:
+        return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
 
     return NextResponse.json({ success: true, message: `${action} action completed` })

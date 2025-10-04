@@ -157,12 +157,12 @@ export const authOptions: NextAuthOptions = {
                 name: token.name!,
                 password: hashedPassword,
                 role: "FREELANCER",
-                image: token.picture,
                 freelancerProfile: {
                   create: {
                     name: token.name!,
                     email: token.email!,
                     profileImage: token.picture,
+                    experience: "LinkedIn authenticated freelancer", // Required field
                   }
                 }
               }
