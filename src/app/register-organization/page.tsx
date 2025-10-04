@@ -285,7 +285,7 @@ export default function RegisterOrganizationPage() {
     >
       {/* Theme toggle in top right corner */}
       <div className="absolute top-4 right-4 z-50">
-        <div className="bg-background/80 backdrop-blur-sm border border-border rounded-full p-1 shadow-sm">
+        <div className="bg-background/80 backdrop-blur-sm p-1 shadow-sm">
           <AnimatedThemeToggler className="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground rounded-full transition-colors" />
         </div>
       </div>
