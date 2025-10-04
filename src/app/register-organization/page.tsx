@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, Building2, ArrowLeft } from "lucide-react"
+import { Eye, EyeOff, Building2, ArrowLeft, Mail, Shield } from "lucide-react"
 import { toast } from "sonner"
 import { motion } from "framer-motion"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
@@ -78,6 +79,12 @@ export default function RegisterOrganizationPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState("")
+  const [step, setStep] = useState(1) // 1: Form, 2: OTP Verification
+  const [otp, setOtp] = useState("")
+  const [isOtpSent, setIsOtpSent] = useState(false)
+  const [isOtpVerified, setIsOtpVerified] = useState(false)
+  const [otpError, setOtpError] = useState("")
+  const [otpLoading, setOtpLoading] = useState(false)
   
   // Form fields
   const [formData, setFormData] = useState({
@@ -149,22 +156,96 @@ export default function RegisterOrganizationPage() {
     return Object.keys(errors).length === 0
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-
+  const handleSendOTP = async () => {
     if (!validateForm()) {
       return
     }
 
+    setOtpLoading(true)
+    setOtpError("")
+
+    try {
+      const response = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          organizationName: formData.organizationName
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setIsOtpSent(true)
+        setStep(2)
+        toast.success("Verification code sent to your email!")
+      } else {
+        setOtpError(result.error || "Failed to send verification code")
+        toast.error(result.error || "Failed to send verification code")
+      }
+    } catch (err) {
+      setOtpError("An error occurred while sending verification code")
+      toast.error("An error occurred while sending verification code")
+    } finally {
+      setOtpLoading(false)
+    }
+  }
+
+  const handleVerifyOTP = async () => {
+    if (!otp || otp.length !== 6) {
+      setOtpError("Please enter a valid 6-digit code")
+      return
+    }
+
+    setOtpLoading(true)
+    setOtpError("")
+
+    try {
+      const response = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          otp: otp
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setIsOtpVerified(true)
+        toast.success("Email verified successfully!")
+        // Proceed with registration
+        await handleRegistration()
+      } else {
+        setOtpError(result.error || "Invalid verification code")
+        toast.error(result.error || "Invalid verification code")
+      }
+    } catch (err) {
+      setOtpError("An error occurred while verifying code")
+      toast.error("An error occurred while verifying code")
+    } finally {
+      setOtpLoading(false)
+    }
+  }
+
+  const handleRegistration = async () => {
     startTransition(async () => {
       try {
-        const response = await fetch("/api/organizations/register", {
+        const response = await fetch("/api/organizations/register-with-otp", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
           },
-          body: JSON.stringify(formData)
+          body: JSON.stringify({
+            ...formData,
+            otp: otp
+          })
         })
 
         const result = await response.json()
@@ -181,6 +262,18 @@ export default function RegisterOrganizationPage() {
         toast.error("An error occurred during registration")
       }
     })
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+
+    if (!validateForm()) {
+      return
+    }
+
+    // Send OTP instead of direct registration
+    await handleSendOTP()
   }
 
   return (
@@ -231,210 +324,286 @@ export default function RegisterOrganizationPage() {
             <CardHeader>
               <CardTitle>Organization Registration</CardTitle>
               <CardDescription>
-                Please fill in all the required information to register your organization.
-                <br />
-                <span className="text-sm text-orange-600 font-medium">
-                  Note: Only organization email addresses are allowed (no personal email providers).
-                </span>
+                {step === 1 ? (
+                  <>
+                    Please fill in all the required information to register your organization.
+                    <br />
+                    <span className="text-sm text-orange-600 font-medium">
+                      Note: Only organization email addresses are allowed (no personal email providers).
+                    </span>
+                  </>
+                ) : (
+                  "Verify your email address to complete registration"
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* User Information Section */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold border-b pb-2">User Information</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Login Email *</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="organization@company.com"
-                        value={formData.email}
-                        onChange={(e) => handleInputChange("email", e.target.value)}
-                        required
-                        className={fieldErrors.email ? "border-red-500" : ""}
-                      />
-                      {fieldErrors.email && (
-                        <p className="text-sm text-red-600">{fieldErrors.email}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Full Name</Label>
-                      <Input
-                        id="name"
-                        type="text"
-                        placeholder="John Doe"
-                        value={formData.name}
-                        onChange={(e) => handleInputChange("name", e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Password *</Label>
-                      <div className="relative">
+              {/* Step 1: Registration Form */}
+              {step === 1 && (
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* User Information Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold border-b pb-2">User Information</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Login Email *</Label>
                         <Input
-                          id="password"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Enter your password"
-                          value={formData.password}
-                          onChange={(e) => handleInputChange("password", e.target.value)}
+                          id="email"
+                          type="email"
+                          placeholder="organization@company.com"
+                          value={formData.email}
+                          onChange={(e) => handleInputChange("email", e.target.value)}
                           required
-                          className={fieldErrors.password ? "border-red-500" : ""}
+                          className={fieldErrors.email ? "border-red-500" : ""}
                         />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </Button>
+                        {fieldErrors.email && (
+                          <p className="text-sm text-red-600">{fieldErrors.email}</p>
+                        )}
                       </div>
-                      {fieldErrors.password && (
-                        <p className="text-sm text-red-600">{fieldErrors.password}</p>
-                      )}
-                    </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirm Password *</Label>
-                      <div className="relative">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Full Name</Label>
                         <Input
-                          id="confirmPassword"
-                          type={showConfirmPassword ? "text" : "password"}
-                          placeholder="Confirm your password"
-                          value={formData.confirmPassword}
-                          onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
-                          required
-                          className={fieldErrors.confirmPassword ? "border-red-500" : ""}
+                          id="name"
+                          type="text"
+                          placeholder="John Doe"
+                          value={formData.name}
+                          onChange={(e) => handleInputChange("name", e.target.value)}
                         />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </Button>
                       </div>
-                      {fieldErrors.confirmPassword && (
-                        <p className="text-sm text-red-600">{fieldErrors.confirmPassword}</p>
-                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="password">Password *</Label>
+                        <div className="relative">
+                          <Input
+                            id="password"
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Enter your password"
+                            value={formData.password}
+                            onChange={(e) => handleInputChange("password", e.target.value)}
+                            required
+                            className={fieldErrors.password ? "border-red-500" : ""}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        {fieldErrors.password && (
+                          <p className="text-sm text-red-600">{fieldErrors.password}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="confirmPassword">Confirm Password *</Label>
+                        <div className="relative">
+                          <Input
+                            id="confirmPassword"
+                            type={showConfirmPassword ? "text" : "password"}
+                            placeholder="Confirm your password"
+                            value={formData.confirmPassword}
+                            onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
+                            required
+                            className={fieldErrors.confirmPassword ? "border-red-500" : ""}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          >
+                            {showConfirmPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        {fieldErrors.confirmPassword && (
+                          <p className="text-sm text-red-600">{fieldErrors.confirmPassword}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Organization Information Section */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold border-b pb-2">Organization Information</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Organization Information Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold border-b pb-2">Organization Information</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="organizationName">Organization Name *</Label>
+                        <Input
+                          id="organizationName"
+                          type="text"
+                          placeholder="Acme Corporation"
+                          value={formData.organizationName}
+                          onChange={(e) => handleInputChange("organizationName", e.target.value)}
+                          required
+                          className={fieldErrors.organizationName ? "border-red-500" : ""}
+                        />
+                        {fieldErrors.organizationName && (
+                          <p className="text-sm text-red-600">{fieldErrors.organizationName}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="website">Website</Label>
+                        <Input
+                          id="website"
+                          type="url"
+                          placeholder="https://company.com"
+                          value={formData.website}
+                          onChange={(e) => handleInputChange("website", e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="contactMail">Contact Email *</Label>
+                        <Input
+                          id="contactMail"
+                          type="email"
+                          placeholder="contact@company.com"
+                          value={formData.contactMail}
+                          onChange={(e) => handleInputChange("contactMail", e.target.value)}
+                          required
+                          className={fieldErrors.contactMail ? "border-red-500" : ""}
+                        />
+                        {fieldErrors.contactMail && (
+                          <p className="text-sm text-red-600">{fieldErrors.contactMail}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Phone Number</Label>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          placeholder="+1 (555) 123-4567"
+                          value={formData.phone}
+                          onChange={(e) => handleInputChange("phone", e.target.value)}
+                        />
+                      </div>
+                    </div>
+
                     <div className="space-y-2">
-                      <Label htmlFor="organizationName">Organization Name *</Label>
+                      <Label htmlFor="companyLocation">Company Location *</Label>
                       <Input
-                        id="organizationName"
+                        id="companyLocation"
                         type="text"
-                        placeholder="Acme Corporation"
-                        value={formData.organizationName}
-                        onChange={(e) => handleInputChange("organizationName", e.target.value)}
+                        placeholder="123 Business St, City, State, Country"
+                        value={formData.companyLocation}
+                        onChange={(e) => handleInputChange("companyLocation", e.target.value)}
                         required
-                        className={fieldErrors.organizationName ? "border-red-500" : ""}
+                        className={fieldErrors.companyLocation ? "border-red-500" : ""}
                       />
-                      {fieldErrors.organizationName && (
-                        <p className="text-sm text-red-600">{fieldErrors.organizationName}</p>
+                      {fieldErrors.companyLocation && (
+                        <p className="text-sm text-red-600">{fieldErrors.companyLocation}</p>
                       )}
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="website">Website</Label>
-                      <Input
-                        id="website"
-                        type="url"
-                        placeholder="https://company.com"
-                        value={formData.website}
-                        onChange={(e) => handleInputChange("website", e.target.value)}
-                      />
-                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="contactMail">Contact Email *</Label>
-                      <Input
-                        id="contactMail"
-                        type="email"
-                        placeholder="contact@company.com"
-                        value={formData.contactMail}
-                        onChange={(e) => handleInputChange("contactMail", e.target.value)}
-                        required
-                        className={fieldErrors.contactMail ? "border-red-500" : ""}
-                      />
-                      {fieldErrors.contactMail && (
-                        <p className="text-sm text-red-600">{fieldErrors.contactMail}</p>
-                      )}
-                    </div>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="text-destructive text-sm bg-destructive/10 p-3 rounded-md border border-destructive/20"
+                    >
+                      {error}
+                    </motion.div>
+                  )}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number</Label>
-                      <Input
-                        id="phone"
-                        type="tel"
-                        placeholder="+1 (555) 123-4567"
-                        value={formData.phone}
-                        onChange={(e) => handleInputChange("phone", e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="companyLocation">Company Location *</Label>
-                    <Input
-                      id="companyLocation"
-                      type="text"
-                      placeholder="123 Business St, City, Country"
-                      value={formData.companyLocation}
-                      onChange={(e) => handleInputChange("companyLocation", e.target.value)}
-                      required
-                      className={fieldErrors.companyLocation ? "border-red-500" : ""}
-                    />
-                    {fieldErrors.companyLocation && (
-                      <p className="text-sm text-red-600">{fieldErrors.companyLocation}</p>
-                    )}
-                  </div>
-                </div>
-
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="text-destructive text-sm bg-destructive/10 p-3 rounded-md border border-destructive/20"
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={isPending || otpLoading}
                   >
-                    {error}
-                  </motion.div>
-                )}
+                    {otpLoading ? "Sending Code..." : "Request Email OTP"}
+                  </Button>
+                </form>
+              )}
 
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={isPending}
-                >
-                  {isPending ? "Registering..." : "Register Organization"}
-                </Button>
-              </form>
+              {/* Step 2: OTP Verification */}
+              {step === 2 && (
+                <div className="space-y-6">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Mail className="h-8 w-8 text-blue-600" />
+                    </div>
+                    <h3 className="text-xl font-semibold">Verify Your Email</h3>
+                    <p className="text-muted-foreground mt-2">
+                      We've sent a 6-digit verification code to <strong>{formData.email}</strong>
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="otp">Enter Verification Code</Label>
+                      <div className="flex justify-center">
+                        <InputOTP
+                          maxLength={6}
+                          value={otp}
+                          onChange={(value) => setOtp(value)}
+                          render={({ slots }) => (
+                            <InputOTPGroup>
+                              {slots.map((slot, index) => (
+                                <InputOTPSlot key={index} {...slot} index={index} />
+                              ))}
+                            </InputOTPGroup>
+                          )}
+                        />
+                      </div>
+                      {otpError && (
+                        <p className="text-sm text-red-600 text-center">{otpError}</p>
+                      )}
+                    </div>
+
+                    <div className="text-center">
+                      <Button
+                        variant="link"
+                        onClick={handleSendOTP}
+                        disabled={otpLoading}
+                        className="text-sm"
+                      >
+                        {otpLoading ? "Resending..." : "Didn't receive the code? Resend"}
+                      </Button>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => setStep(1)}
+                        className="flex-1"
+                        disabled={otpLoading}
+                      >
+                        Back
+                      </Button>
+                      <Button
+                        onClick={handleVerifyOTP}
+                        className="flex-1"
+                        disabled={otpLoading || otp.length !== 6}
+                      >
+                        {otpLoading ? "Verifying..." : "Verify & Register"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
