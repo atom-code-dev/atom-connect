@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Search, Filter, CheckCircle, XCircle, Clock, Eye, Building, Users, AlertTriangle, Star } from "lucide-react"
+import HexagonLoader from "@/components/ui/hexagon-loader"
 
 interface Organization {
   id: string
@@ -212,7 +213,7 @@ export default function MaintainerOrganizationsPage() {
   if (status === "loading" || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <HexagonLoader size={80} />
       </div>
     )
   }
