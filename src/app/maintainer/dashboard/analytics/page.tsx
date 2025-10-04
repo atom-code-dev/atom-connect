@@ -282,7 +282,7 @@ export default function MaintainerAnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Your Approved Reviews</CardTitle>
-            <CardDescription>Organizations and freelancers you have approved</CardDescription>
+            <CardDescription>Organizations you have approved (freelancers don't require approval)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border">

@@ -10,11 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Search, Filter, CheckCircle, XCircle, Clock, Eye, Users, AlertTriangle, Star, MapPin, Briefcase } from "lucide-react"
+import { Search, Filter, Eye, Users, Star, MapPin } from "lucide-react"
 import HexagonLoader from "@/components/ui/hexagon-loader"
 
 interface Freelancer {
@@ -30,7 +27,6 @@ interface Freelancer {
   location: string
   rating: number
   completedTrainings: number
-  profileCompleted: boolean
   createdAt: string
   user: {
     name?: string
@@ -46,12 +42,6 @@ interface FreelancersResponse {
     total: number
     pages: number
   }
-}
-
-const statusColors = {
-  APPROVED: "bg-green-100 text-green-800",
-  REJECTED: "bg-red-100 text-red-800",
-  PENDING: "bg-yellow-100 text-yellow-800",
 }
 
 const availabilityColors = {
@@ -74,13 +64,8 @@ export default function MaintainerFreelancersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("ALL")
   const [availabilityFilter, setAvailabilityFilter] = useState("ALL")
   const [trainerTypeFilter, setTrainerTypeFilter] = useState("ALL")
-  const [selectedFreelancer, setSelectedFreelancer] = useState<Freelancer | null>(null)
-  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
-  const [reviewDecision, setReviewDecision] = useState("")
-  const [reviewComments, setReviewComments] = useState("")
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -108,7 +93,7 @@ export default function MaintainerFreelancersPage() {
     if (session) {
       fetchFreelancers()
     }
-  }, [searchTerm, statusFilter, availabilityFilter, trainerTypeFilter, pagination.page])
+  }, [searchTerm, availabilityFilter, trainerTypeFilter, pagination.page])
 
   const fetchFreelancers = async () => {
     try {
@@ -140,90 +125,6 @@ export default function MaintainerFreelancersPage() {
 
   const filteredFreelancers = freelancers
 
-  const handleReview = (freelancer: Freelancer) => {
-    setSelectedFreelancer(freelancer)
-    setReviewDecision("")
-    setReviewComments("")
-    setIsReviewDialogOpen(true)
-  }
-
-  const submitReview = async () => {
-    if (!selectedFreelancer || !reviewDecision) return
-
-    try {
-      const action = reviewDecision === "APPROVED" ? "activate" : "deactivate"
-      const response = await fetch("/api/freelancers", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          freelancerIds: [selectedFreelancer.id],
-          action,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to submit review")
-      }
-
-      setIsReviewDialogOpen(false)
-      setSelectedFreelancer(null)
-      setReviewDecision("")
-      setReviewComments("")
-      
-      // Refresh the freelancers list
-      fetchFreelancers()
-    } catch (err) {
-      console.error("Error submitting review:", err)
-      setError(err instanceof Error ? err.message : "Unknown error")
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "APPROVED":
-        return <CheckCircle className="h-4 w-4 text-green-600" />
-      case "REJECTED":
-        return <XCircle className="h-4 w-4 text-red-600" />
-      case "PENDING":
-        return <Clock className="h-4 w-4 text-yellow-600" />
-      default:
-        return <AlertTriangle className="h-4 w-4 text-gray-600" />
-    }
-  }
-
-  const toggleAccountStatus = async (freelancerId: string, currentStatus: string) => {
-    try {
-      const action = currentStatus === "APPROVED" ? "deactivate" : "activate"
-      const response = await fetch("/api/freelancers", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          freelancerIds: [freelancerId],
-          action,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to toggle account status")
-      }
-
-      // Refresh the freelancers list
-      fetchFreelancers()
-    } catch (err) {
-      console.error("Error toggling account status:", err)
-      setError(err instanceof Error ? err.message : "Unknown error")
-    }
-  }
-
-  const getFreelancerStatus = (freelancer: Freelancer) => {
-    // For freelancers, we'll use profileCompleted to determine status
-    return freelancer.profileCompleted ? "APPROVED" : "PENDING"
-  }
-
   if (status === "loading" || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -254,19 +155,13 @@ export default function MaintainerFreelancersPage() {
         {/* Page Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Freelancers Management</h1>
-            <p className="text-muted-foreground">Review and manage freelancer profiles</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline">
-              <Users className="h-4 w-4 mr-2" />
-              My Reviews
-            </Button>
+            <h1 className="text-3xl font-bold">Freelancers Directory</h1>
+            <p className="text-muted-foreground">View and manage freelancer profiles</p>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Total Freelancers</CardTitle>
@@ -275,284 +170,159 @@ export default function MaintainerFreelancersPage() {
               <div className="text-2xl font-bold">{pagination.total}</div>
             </CardContent>
           </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">In Training</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{freelancers.filter(f => f.availability === "IN_TRAINING").length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Available Now</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{freelancers.filter(f => f.availability === "AVAILABLE").length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Avg Rating</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {(freelancers.reduce((sum, f) => sum + f.rating, 0) / freelancers.length).toFixed(1)}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
+          <CardHeader>
+            <CardTitle>Filter Freelancers</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{freelancers.filter(f => !f.profileCompleted).length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Available Now</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{freelancers.filter(f => f.availability === "AVAILABLE").length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Avg Rating</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {(freelancers.reduce((sum, f) => sum + f.rating, 0) / freelancers.length).toFixed(1)}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filter Freelancers</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search freelancers..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Status</SelectItem>
-                <SelectItem value="PENDING">Pending</SelectItem>
-                <SelectItem value="APPROVED">Approved</SelectItem>
-                <SelectItem value="REJECTED">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Availability" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Availability</SelectItem>
-                <SelectItem value="AVAILABLE">Available</SelectItem>
-                <SelectItem value="IN_TRAINING">In Training</SelectItem>
-                <SelectItem value="NOT_AVAILABLE">Not Available</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={trainerTypeFilter} onValueChange={setTrainerTypeFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Trainer Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Types</SelectItem>
-                <SelectItem value="CORPORATE">Corporate</SelectItem>
-                <SelectItem value="UNIVERSITY">University</SelectItem>
-                <SelectItem value="BOTH">Both</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Freelancers Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Freelancer Reviews</CardTitle>
-          <CardDescription>Review and manage freelancer profiles</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Skills</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Rating</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredFreelancers.map((freelancer) => (
-                  <TableRow key={freelancer.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        {freelancer.name}
-                      </div>
-                    </TableCell>
-                    <TableCell>{freelancer.email}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {freelancer.skills.slice(0, 2).map(skill => (
-                          <Badge key={skill} variant="outline" className="text-xs">
-                            {skill}
-                          </Badge>
-                        ))}
-                        {freelancer.skills.length > 2 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{freelancer.skills.length - 2}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={trainerTypeColors[freelancer.trainerType]}>
-                        {freelancer.trainerType}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        <span>{freelancer.location}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(getFreelancerStatus(freelancer))}
-                        <Badge className={statusColors[getFreelancerStatus(freelancer)]}>
-                          {getFreelancerStatus(freelancer)}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4" />
-                        <span>{freelancer.rating}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <Users className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          {!freelancer.profileCompleted && (
-                            <DropdownMenuItem onClick={() => handleReview(freelancer)}>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Review
-                            </DropdownMenuItem>
-                          )}
-                          {freelancer.profileCompleted ? (
-                            <DropdownMenuItem onClick={() => toggleAccountStatus(freelancer.id, getFreelancerStatus(freelancer))}>
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Disable Account
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem onClick={() => toggleAccountStatus(freelancer.id, getFreelancerStatus(freelancer))}>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Enable Account
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Review Dialog */}
-      <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Review Freelancer: {selectedFreelancer?.name}</DialogTitle>
-            <DialogDescription>
-              Review and approve/reject this freelancer profile
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm font-medium">Email</Label>
-                <p className="text-sm text-muted-foreground">{selectedFreelancer?.email}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search freelancers..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
-              <div>
-                <Label className="text-sm font-medium">Phone</Label>
-                <p className="text-sm text-muted-foreground">{selectedFreelancer?.phone}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Trainer Type</Label>
-                <Badge className={selectedFreelancer?.trainerType ? trainerTypeColors[selectedFreelancer.trainerType] : ""}>
-                  {selectedFreelancer?.trainerType}
-                </Badge>
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Location</Label>
-                <p className="text-sm text-muted-foreground">{selectedFreelancer?.location}</p>
-              </div>
-            </div>
-            <div>
-              <Label className="text-sm font-medium">Skills</Label>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {selectedFreelancer?.skills.map(skill => (
-                  <Badge key={skill} variant="outline" className="text-xs">
-                    {skill}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            <div>
-              <Label className="text-sm font-medium">Experience</Label>
-              <p className="text-sm text-muted-foreground mt-1">{selectedFreelancer?.experience}</p>
-            </div>
-            <div>
-              <Label className="text-sm font-medium">LinkedIn Profile</Label>
-              <a href={selectedFreelancer?.linkedinProfile} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
-                {selectedFreelancer?.linkedinProfile}
-              </a>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="decision" className="text-right">
-                Decision
-              </Label>
-              <Select value={reviewDecision} onValueChange={setReviewDecision}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select decision" />
+              <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Availability" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="APPROVED">Approve</SelectItem>
-                  <SelectItem value="REJECTED">Reject</SelectItem>
+                  <SelectItem value="ALL">All Availability</SelectItem>
+                  <SelectItem value="AVAILABLE">Available</SelectItem>
+                  <SelectItem value="IN_TRAINING">In Training</SelectItem>
+                  <SelectItem value="NOT_AVAILABLE">Not Available</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={trainerTypeFilter} onValueChange={setTrainerTypeFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Trainer Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Types</SelectItem>
+                  <SelectItem value="CORPORATE">Corporate</SelectItem>
+                  <SelectItem value="UNIVERSITY">University</SelectItem>
+                  <SelectItem value="BOTH">Both</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="comments" className="text-right">
-                Comments
-              </Label>
-              <Textarea
-                id="comments"
-                placeholder="Provide comments for your decision..."
-                value={reviewComments}
-                onChange={(e) => setReviewComments(e.target.value)}
-                className="col-span-3"
-              />
+          </CardContent>
+        </Card>
+
+        {/* Freelancers Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Freelancers Directory</CardTitle>
+            <CardDescription>View freelancer profiles and information</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Skills</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Rating</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredFreelancers.map((freelancer) => (
+                    <TableRow key={freelancer.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          {freelancer.name}
+                        </div>
+                      </TableCell>
+                      <TableCell>{freelancer.email}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {freelancer.skills.slice(0, 2).map(skill => (
+                            <Badge key={skill} variant="outline" className="text-xs">
+                              {skill}
+                            </Badge>
+                          ))}
+                          {freelancer.skills.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{freelancer.skills.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={trainerTypeColors[freelancer.trainerType]}>
+                          {freelancer.trainerType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          <span>{freelancer.location}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Star className="h-4 w-4" />
+                          <span>{freelancer.rating}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <Users className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsReviewDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={submitReview} disabled={!reviewDecision}>
-              Submit Review
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   )

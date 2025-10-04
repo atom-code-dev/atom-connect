@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
       currentDate.setMonth(currentDate.getMonth() + 1)
     }
 
-    // Get review history - only approved reviews
+    // Get review history - only approved organizations (no freelancer approvals needed)
     const reviewHistory = []
     
     // Get approved organizations as review history
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
       orderBy: {
         updatedAt: 'desc' // Use updatedAt to show when it was last modified/approved
       },
-      take: 15
+      take: 30
     })
 
     approvedOrganizations.forEach(org => {
@@ -118,37 +118,6 @@ export async function GET(request: NextRequest) {
         reviewedBy: session.user?.name || "Current Maintainer",
         reviewedAt: org.updatedAt.toISOString(),
         comments: "Organization verification approved"
-      })
-    })
-
-    // Get approved freelancers as review history
-    const approvedFreelancers = await db.freelancerProfile.findMany({
-      where: {
-        profileCompleted: true,
-        ...(typeFilter === "ALL" ? {} : {})
-      },
-      include: {
-        user: {
-          select: {
-            name: true
-          }
-        }
-      },
-      orderBy: {
-        updatedAt: 'desc' // Use updatedAt to show when it was last modified/approved
-      },
-      take: 15
-    })
-
-    approvedFreelancers.forEach(freelancer => {
-      reviewHistory.push({
-        id: `freelancer-${freelancer.id}`,
-        type: "FREELANCER" as const,
-        entityName: freelancer.name,
-        status: "APPROVED",
-        reviewedBy: session.user?.name || "Current Maintainer",
-        reviewedAt: freelancer.updatedAt.toISOString(),
-        comments: "Freelancer profile approved"
       })
     })
 

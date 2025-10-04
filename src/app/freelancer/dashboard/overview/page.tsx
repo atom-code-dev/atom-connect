@@ -160,38 +160,12 @@ export default function FreelancerDashboardOverview() {
           <p className="text-muted-foreground">Find trainings and manage your profile</p>
         </div>
         <div className="flex gap-2">
-          {!dashboardStats.profileCompleted && (
-            <Button variant="outline">
-              <Briefcase className="h-4 w-4 mr-2" />
-              Complete Profile
-            </Button>
-          )}
           <Button>
             <BookOpen className="h-4 w-4 mr-2" />
             Find Trainings
           </Button>
         </div>
       </div>
-
-      {/* Profile Completion Alert */}
-      {!dashboardStats.profileCompleted && (
-        <Card className="border-orange-200 bg-orange-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-orange-800">
-              <Clock className="h-5 w-5" />
-              Complete Your Profile
-            </CardTitle>
-            <CardDescription className="text-orange-700">
-              Complete your profile to increase your chances of getting selected for trainings
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button className="bg-orange-600 hover:bg-orange-700">
-              Complete Profile Now
-            </Button>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
