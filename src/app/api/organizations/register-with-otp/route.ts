@@ -77,8 +77,11 @@ export async function POST(request: NextRequest) {
       otp
     } = body
 
+    console.log('Organization registration attempt:', { email, organizationName })
+
     // Validate OTP verification first
     if (!global.otpStorage || !global.otpStorage.has(email)) {
+      console.log('OTP verification failed: No OTP storage or email not found')
       return NextResponse.json({ 
         success: false, 
         error: 'Email verification required. Please request OTP first.' 
@@ -86,10 +89,12 @@ export async function POST(request: NextRequest) {
     }
 
     const otpData = global.otpStorage.get(email)
+    console.log('OTP data found:', !!otpData)
     
     // Check if OTP is expired
     if (new Date() > new Date(otpData.expiresAt)) {
       global.otpStorage.delete(email)
+      console.log('OTP expired for email:', email)
       return NextResponse.json({ 
         success: false, 
         error: 'Verification code has expired. Please request a new code.' 
@@ -98,6 +103,7 @@ export async function POST(request: NextRequest) {
 
     // Verify OTP
     if (otpData.code !== otp) {
+      console.log('Invalid OTP for email:', email)
       return NextResponse.json({ 
         success: false, 
         error: 'Invalid verification code.' 
@@ -106,6 +112,7 @@ export async function POST(request: NextRequest) {
 
     // Remove OTP after successful verification
     global.otpStorage.delete(email)
+    console.log('OTP verified and removed for email:', email)
 
     // Validate email domain
     const emailValidation = validateEmailDomain(email)
@@ -147,6 +154,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (existingUser) {
+      console.log('Email already exists:', email)
       return NextResponse.json({ 
         success: false,
         error: 'Email already exists' 
@@ -208,6 +216,11 @@ export async function POST(request: NextRequest) {
       })
 
       return organizationProfile
+    })
+
+    console.log('Organization created successfully:', { 
+      organizationId: result.id, 
+      email: result.user.email 
     })
 
     return NextResponse.json({ 
