@@ -2,9 +2,8 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/layout/DashboardLayout"
-import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,94 +16,58 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Search, Filter, CheckCircle, XCircle, Clock, Eye, Users, AlertTriangle, Star, MapPin, Briefcase } from "lucide-react"
 
-// Dummy data for maintainer freelancers
-const dummyFreelancers = [
-  {
-    id: "1",
-    name: "John Doe",
-    email: "john@example.com",
-    phone: "+91-9876543210",
-    skills: ["React.js", "Node.js", "TypeScript", "MongoDB"],
-    trainerType: "CORPORATE",
-    experience: "5+ years of experience in full-stack development with expertise in React and Node.js",
-    linkedinProfile: "https://linkedin.com/in/johndoe",
-    availability: "AVAILABLE",
-    location: "Bangalore, Karnataka",
-    rating: 4.8,
-    completedTrainings: 25,
-    status: "APPROVED",
-    reviewer: "Alice Johnson",
-    reviewedDate: "2024-01-20",
-  },
-  {
-    id: "2",
-    name: "Jane Smith",
-    email: "jane@example.com",
-    phone: "+91-9876543211",
-    skills: ["Python", "Django", "Machine Learning", "Data Science"],
-    trainerType: "UNIVERSITY",
-    experience: "8+ years of experience in data science and machine learning",
-    linkedinProfile: "https://linkedin.com/in/janesmith",
-    availability: "IN_TRAINING",
-    location: "Mumbai, Maharashtra",
-    rating: 4.9,
-    completedTrainings: 40,
-    status: "PENDING",
-    reviewer: null,
-    reviewedDate: null,
-  },
-  {
-    id: "3",
-    name: "Bob Johnson",
-    email: "bob@example.com",
-    phone: "+91-9876543212",
-    skills: ["Leadership", "Communication", "Team Building", "Project Management"],
-    trainerType: "CORPORATE",
-    experience: "10+ years of experience in corporate training and leadership development",
-    linkedinProfile: "https://linkedin.com/in/bobjohnson",
-    availability: "AVAILABLE",
-    location: "Delhi, Delhi",
-    rating: 4.7,
-    completedTrainings: 60,
-    status: "REJECTED",
-    reviewer: "Bob Smith",
-    reviewedDate: "2024-01-19",
-  },
-  {
-    id: "4",
-    name: "Alice Brown",
-    email: "alice@example.com",
-    phone: "+91-9876543213",
-    skills: ["Java", "Spring Boot", "Microservices", "AWS"],
-    trainerType: "BOTH",
-    experience: "6+ years of experience in enterprise Java development and cloud architecture",
-    linkedinProfile: "https://linkedin.com/in/alicebrown",
-    availability: "NOT_AVAILABLE",
-    location: "Pune, Maharashtra",
-    rating: 4.6,
-    completedTrainings: 30,
-    status: "APPROVED",
-    reviewer: "Carol Davis",
-    reviewedDate: "2024-01-18",
-  },
-  {
-    id: "5",
-    name: "Charlie Wilson",
-    email: "charlie@example.com",
-    phone: "+91-9876543214",
-    skills: ["Angular", "TypeScript", "RxJS", "NgRx"],
-    trainerType: "CORPORATE",
-    experience: "4+ years of experience in frontend development with Angular",
-    linkedinProfile: "https://linkedin.com/in/charliewilson",
-    availability: "AVAILABLE",
-    location: "Chennai, Tamil Nadu",
-    rating: 4.5,
-    completedTrainings: 18,
-    status: "PENDING",
-    reviewer: null,
-    reviewedDate: null,
-  },
-]
+interface Freelancer {
+  id: string
+  name: string
+  email: string
+  phone?: string
+  skills: string[]
+  trainerType: "CORPORATE" | "UNIVERSITY" | "BOTH"
+  experience: string
+  linkedinProfile?: string
+  availability: "AVAILABLE" | "IN_TRAINING" | "NOT_AVAILABLE"
+  location: string
+  rating: number
+  completedTrainings: number
+  profileCompleted: boolean
+  createdAt: string
+  user: {
+    name?: string
+    email: string
+  }
+}
+
+interface FreelancersResponse {
+  freelancers: Freelancer[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    pages: number
+  }
+}
+
+export default function MaintainerFreelancersPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  
+  const [freelancers, setFreelancers] = useState<Freelancer[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState("ALL")
+  const [availabilityFilter, setAvailabilityFilter] = useState("ALL")
+  const [trainerTypeFilter, setTrainerTypeFilter] = useState("ALL")
+  const [selectedFreelancer, setSelectedFreelancer] = useState<Freelancer | null>(null)
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
+  const [reviewDecision, setReviewDecision] = useState("")
+  const [reviewComments, setReviewComments] = useState("")
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0
+  })
 
 const statusColors = {
   APPROVED: "bg-green-100 text-green-800",
@@ -149,52 +112,87 @@ export default function MaintainerFreelancersPage() {
       router.push("/")
       return
     }
+
+    fetchFreelancers()
   }, [session, status, router])
 
-  if (status === "loading") {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    )
+  useEffect(() => {
+    if (session) {
+      fetchFreelancers()
+    }
+  }, [searchTerm, statusFilter, availabilityFilter, trainerTypeFilter, pagination.page])
+
+  const fetchFreelancers = async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+        search: searchTerm,
+        trainerType: trainerTypeFilter === "ALL" ? "" : trainerTypeFilter,
+        availability: availabilityFilter === "ALL" ? "" : availabilityFilter,
+      })
+
+      const response = await fetch(`/api/freelancers?${params}`)
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch freelancers")
+      }
+      
+      const data: FreelancersResponse = await response.json()
+      setFreelancers(data.freelancers)
+      setPagination(data.pagination)
+    } catch (err) {
+      console.error("Error fetching freelancers:", err)
+      setError(err instanceof Error ? err.message : "Unknown error")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  if (!session) {
-    return null
-  }
+  const filteredFreelancers = freelancers
 
-  const filteredFreelancers = dummyFreelancers.filter(freelancer => {
-    const matchesSearch = freelancer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         freelancer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         freelancer.skills.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase()))
-    const matchesStatus = statusFilter === "ALL" || freelancer.status === statusFilter
-    const matchesAvailability = availabilityFilter === "ALL" || freelancer.availability === availabilityFilter
-    const matchesTrainerType = trainerTypeFilter === "ALL" || freelancer.trainerType === trainerTypeFilter
-    
-    return matchesSearch && matchesStatus && matchesAvailability && matchesTrainerType
-  })
-
-  const handleReview = (freelancer) => {
+  const handleReview = (freelancer: Freelancer) => {
     setSelectedFreelancer(freelancer)
     setReviewDecision("")
     setReviewComments("")
     setIsReviewDialogOpen(true)
   }
 
-  const submitReview = () => {
-    // Submit review logic would go here
-    console.log("Submitting freelancer review:", {
-      freelancerId: selectedFreelancer.id,
-      decision: reviewDecision,
-      comments: reviewComments,
-    })
-    setIsReviewDialogOpen(false)
-    setSelectedFreelancer(null)
-    setReviewDecision("")
-    setReviewComments("")
+  const submitReview = async () => {
+    if (!selectedFreelancer || !reviewDecision) return
+
+    try {
+      const action = reviewDecision === "APPROVED" ? "activate" : "deactivate"
+      const response = await fetch("/api/freelancers", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          freelancerIds: [selectedFreelancer.id],
+          action,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to submit review")
+      }
+
+      setIsReviewDialogOpen(false)
+      setSelectedFreelancer(null)
+      setReviewDecision("")
+      setReviewComments("")
+      
+      // Refresh the freelancers list
+      fetchFreelancers()
+    } catch (err) {
+      console.error("Error submitting review:", err)
+      setError(err instanceof Error ? err.message : "Unknown error")
+    }
   }
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case "APPROVED":
         return <CheckCircle className="h-4 w-4 text-green-600" />
@@ -207,9 +205,59 @@ export default function MaintainerFreelancersPage() {
     }
   }
 
-  const toggleAccountStatus = (freelancerId, currentStatus) => {
-    // Toggle account status logic would go here
-    console.log("Toggling account status for freelancer:", freelancerId, "to", currentStatus === "APPROVED" ? "REJECTED" : "APPROVED")
+  const toggleAccountStatus = async (freelancerId: string, currentStatus: string) => {
+    try {
+      const action = currentStatus === "APPROVED" ? "deactivate" : "activate"
+      const response = await fetch("/api/freelancers", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          freelancerIds: [freelancerId],
+          action,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to toggle account status")
+      }
+
+      // Refresh the freelancers list
+      fetchFreelancers()
+    } catch (err) {
+      console.error("Error toggling account status:", err)
+      setError(err instanceof Error ? err.message : "Unknown error")
+    }
+  }
+
+  const getFreelancerStatus = (freelancer: Freelancer) => {
+    // For freelancers, we'll use profileCompleted to determine status
+    return freelancer.profileCompleted ? "APPROVED" : "PENDING"
+  }
+
+  if (status === "loading" || loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return null
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={fetchFreelancers}>Retry</Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -236,7 +284,7 @@ export default function MaintainerFreelancersPage() {
               <CardTitle className="text-sm font-medium">Total Freelancers</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{dummyFreelancers.length}</div>
+              <div className="text-2xl font-bold">{pagination.total}</div>
             </CardContent>
           </Card>
         <Card>
@@ -244,7 +292,7 @@ export default function MaintainerFreelancersPage() {
             <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dummyFreelancers.filter(f => f.status === "PENDING").length}</div>
+            <div className="text-2xl font-bold">{freelancers.filter(f => !f.profileCompleted).length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -252,7 +300,7 @@ export default function MaintainerFreelancersPage() {
             <CardTitle className="text-sm font-medium">Available Now</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dummyFreelancers.filter(f => f.availability === "AVAILABLE").length}</div>
+            <div className="text-2xl font-bold">{freelancers.filter(f => f.availability === "AVAILABLE").length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -261,7 +309,7 @@ export default function MaintainerFreelancersPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {(dummyFreelancers.reduce((sum, f) => sum + f.rating, 0) / dummyFreelancers.length).toFixed(1)}
+              {(freelancers.reduce((sum, f) => sum + f.rating, 0) / freelancers.length).toFixed(1)}
             </div>
           </CardContent>
         </Card>
@@ -378,9 +426,9 @@ export default function MaintainerFreelancersPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {getStatusIcon(freelancer.status)}
-                        <Badge className={statusColors[freelancer.status]}>
-                          {freelancer.status}
+                        {getStatusIcon(getFreelancerStatus(freelancer))}
+                        <Badge className={statusColors[getFreelancerStatus(freelancer)]}>
+                          {getFreelancerStatus(freelancer)}
                         </Badge>
                       </div>
                     </TableCell>
@@ -402,19 +450,19 @@ export default function MaintainerFreelancersPage() {
                             <Eye className="h-4 w-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
-                          {freelancer.status === "PENDING" && (
+                          {!freelancer.profileCompleted && (
                             <DropdownMenuItem onClick={() => handleReview(freelancer)}>
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Review
                             </DropdownMenuItem>
                           )}
-                          {freelancer.status === "APPROVED" ? (
-                            <DropdownMenuItem onClick={() => toggleAccountStatus(freelancer.id, freelancer.status)}>
+                          {freelancer.profileCompleted ? (
+                            <DropdownMenuItem onClick={() => toggleAccountStatus(freelancer.id, getFreelancerStatus(freelancer))}>
                               <XCircle className="h-4 w-4 mr-2" />
                               Disable Account
                             </DropdownMenuItem>
                           ) : (
-                            <DropdownMenuItem onClick={() => toggleAccountStatus(freelancer.id, freelancer.status)}>
+                            <DropdownMenuItem onClick={() => toggleAccountStatus(freelancer.id, getFreelancerStatus(freelancer))}>
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Enable Account
                             </DropdownMenuItem>
@@ -520,4 +568,5 @@ export default function MaintainerFreelancersPage() {
       </div>
     </DashboardLayout>
   )
+}
 }

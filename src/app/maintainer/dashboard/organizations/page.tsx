@@ -2,9 +2,8 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/layout/DashboardLayout"
-import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,84 +16,54 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Search, Filter, CheckCircle, XCircle, Clock, Eye, Building, Users, AlertTriangle, Star } from "lucide-react"
 
-// Dummy data for maintainer organizations
-const dummyOrganizations = [
-  {
-    id: "1",
-    name: "TechCorp Solutions",
-    email: "contact@techcorp.com",
-    website: "https://techcorp.com",
-    phone: "+91-9876543210",
-    location: "Bangalore, Karnataka",
-    verifiedStatus: "VERIFIED",
-    activeStatus: "ACTIVE",
-    ratings: 4.5,
-    trainingsCount: 12,
-    joinDate: "2024-01-15",
-    reviewer: "Alice Johnson",
-    reviewedDate: "2024-01-20",
-  },
-  {
-    id: "2",
-    name: "Code Academy",
-    email: "info@codeacademy.com",
-    website: "https://codeacademy.com",
-    phone: "+91-9876543211",
-    location: "Mumbai, Maharashtra",
-    verifiedStatus: "PENDING",
-    activeStatus: "ACTIVE",
-    ratings: 4.2,
-    trainingsCount: 8,
-    joinDate: "2024-01-10",
-    reviewer: null,
-    reviewedDate: null,
-  },
-  {
-    id: "3",
-    name: "Innovation Labs",
-    email: "hello@innovationlabs.com",
-    website: "https://innovationlabs.com",
-    phone: "+91-9876543212",
-    location: "Delhi, Delhi",
-    verifiedStatus: "REJECTED",
-    activeStatus: "INACTIVE",
-    ratings: 3.5,
-    trainingsCount: 3,
-    joinDate: "2024-01-08",
-    reviewer: "Bob Smith",
-    reviewedDate: "2024-01-12",
-  },
-  {
-    id: "4",
-    name: "Data Science Hub",
-    email: "info@datasciencehub.com",
-    website: "https://datasciencehub.com",
-    phone: "+91-9876543213",
-    location: "Chennai, Tamil Nadu",
-    verifiedStatus: "VERIFIED",
-    activeStatus: "ACTIVE",
-    ratings: 4.6,
-    trainingsCount: 10,
-    joinDate: "2024-01-18",
-    reviewer: "Carol Davis",
-    reviewedDate: "2024-01-19",
-  },
-  {
-    id: "5",
-    name: "Leadership Institute",
-    email: "contact@leadership.edu",
-    website: "https://leadership.edu",
-    phone: "+91-9876543214",
-    location: "Pune, Maharashtra",
-    verifiedStatus: "PENDING",
-    activeStatus: "ACTIVE",
-    ratings: 4.8,
-    trainingsCount: 15,
-    joinDate: "2024-01-20",
-    reviewer: null,
-    reviewedDate: null,
-  },
-]
+interface Organization {
+  id: string
+  organizationName: string
+  email: string
+  website?: string
+  phone?: string
+  companyLocation: string
+  verifiedStatus: "PENDING" | "VERIFIED" | "REJECTED"
+  activeStatus: "ACTIVE" | "INACTIVE"
+  ratings: number
+  trainingsCount: number
+  createdAt: string
+  user: {
+    name?: string
+    email: string
+  }
+}
+
+interface OrganizationsResponse {
+  organizations: Organization[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    pages: number
+  }
+}
+
+export default function MaintainerOrganizationsPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  
+  const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [verificationFilter, setVerificationFilter] = useState("ALL")
+  const [activeFilter, setActiveFilter] = useState("ALL")
+  const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null)
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
+  const [reviewDecision, setReviewDecision] = useState("")
+  const [reviewComments, setReviewComments] = useState("")
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0
+  })
 
 const verificationStatusColors = {
   VERIFIED: "bg-green-100 text-green-800",
@@ -131,51 +100,87 @@ export default function MaintainerOrganizationsPage() {
       router.push("/")
       return
     }
+
+    fetchOrganizations()
   }, [session, status, router])
 
-  if (status === "loading") {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    )
+  useEffect(() => {
+    if (session) {
+      fetchOrganizations()
+    }
+  }, [searchTerm, verificationFilter, activeFilter, pagination.page])
+
+  const fetchOrganizations = async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+        search: searchTerm,
+        verificationStatus: verificationFilter === "ALL" ? "" : verificationFilter,
+        activeStatus: activeFilter === "ALL" ? "" : activeFilter,
+      })
+
+      const response = await fetch(`/api/organizations?${params}`)
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch organizations")
+      }
+      
+      const data: OrganizationsResponse = await response.json()
+      setOrganizations(data.organizations)
+      setPagination(data.pagination)
+    } catch (err) {
+      console.error("Error fetching organizations:", err)
+      setError(err instanceof Error ? err.message : "Unknown error")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  if (!session) {
-    return null
-  }
+  const filteredOrganizations = organizations
 
-  const filteredOrganizations = dummyOrganizations.filter(org => {
-    const matchesSearch = org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         org.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         org.location.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesVerification = verificationFilter === "ALL" || org.verifiedStatus === verificationFilter
-    const matchesActive = activeFilter === "ALL" || org.activeStatus === activeFilter
-    
-    return matchesSearch && matchesVerification && matchesActive
-  })
-
-  const handleReview = (organization) => {
+  const handleReview = (organization: Organization) => {
     setSelectedOrganization(organization)
     setReviewDecision("")
     setReviewComments("")
     setIsReviewDialogOpen(true)
   }
 
-  const submitReview = () => {
-    // Submit review logic would go here
-    console.log("Submitting organization review:", {
-      organizationId: selectedOrganization.id,
-      decision: reviewDecision,
-      comments: reviewComments,
-    })
-    setIsReviewDialogOpen(false)
-    setSelectedOrganization(null)
-    setReviewDecision("")
-    setReviewComments("")
+  const submitReview = async () => {
+    if (!selectedOrganization || !reviewDecision) return
+
+    try {
+      const action = reviewDecision === "APPROVED" ? "verify" : "unverify"
+      const response = await fetch("/api/organizations", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          organizationIds: [selectedOrganization.id],
+          action,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to submit review")
+      }
+
+      setIsReviewDialogOpen(false)
+      setSelectedOrganization(null)
+      setReviewDecision("")
+      setReviewComments("")
+      
+      // Refresh the organizations list
+      fetchOrganizations()
+    } catch (err) {
+      console.error("Error submitting review:", err)
+      setError(err instanceof Error ? err.message : "Unknown error")
+    }
   }
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case "VERIFIED":
       case "ACTIVE":
@@ -190,9 +195,54 @@ export default function MaintainerOrganizationsPage() {
     }
   }
 
-  const toggleActiveStatus = (organizationId, currentStatus) => {
-    // Toggle active status logic would go here
-    console.log("Toggling active status for organization:", organizationId, "to", currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE")
+  const toggleActiveStatus = async (organizationId: string, currentStatus: string) => {
+    try {
+      const action = currentStatus === "ACTIVE" ? "deactivate" : "activate"
+      const response = await fetch("/api/organizations", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          organizationIds: [organizationId],
+          action,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to toggle active status")
+      }
+
+      // Refresh the organizations list
+      fetchOrganizations()
+    } catch (err) {
+      console.error("Error toggling active status:", err)
+      setError(err instanceof Error ? err.message : "Unknown error")
+    }
+  }
+
+  if (status === "loading" || loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (!session) {
+    return null
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={fetchOrganizations}>Retry</Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -219,7 +269,7 @@ export default function MaintainerOrganizationsPage() {
             <CardTitle className="text-sm font-medium">Total Organizations</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dummyOrganizations.length}</div>
+            <div className="text-2xl font-bold">{pagination.total}</div>
           </CardContent>
         </Card>
         <Card>
@@ -227,7 +277,7 @@ export default function MaintainerOrganizationsPage() {
             <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dummyOrganizations.filter(o => o.verifiedStatus === "PENDING").length}</div>
+            <div className="text-2xl font-bold">{organizations.filter(o => o.verifiedStatus === "PENDING").length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -235,7 +285,7 @@ export default function MaintainerOrganizationsPage() {
             <CardTitle className="text-sm font-medium">Verified</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dummyOrganizations.filter(o => o.verifiedStatus === "VERIFIED").length}</div>
+            <div className="text-2xl font-bold">{organizations.filter(o => o.verifiedStatus === "VERIFIED").length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -243,7 +293,7 @@ export default function MaintainerOrganizationsPage() {
             <CardTitle className="text-sm font-medium">Active Trainings</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dummyOrganizations.reduce((sum, org) => sum + org.trainingsCount, 0)}</div>
+            <div className="text-2xl font-bold">{organizations.reduce((sum, org) => sum + org.trainingsCount, 0)}</div>
           </CardContent>
         </Card>
       </div>
@@ -316,11 +366,11 @@ export default function MaintainerOrganizationsPage() {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <Building className="h-4 w-4" />
-                        {org.name}
+                        {org.organizationName}
                       </div>
                     </TableCell>
                     <TableCell>{org.email}</TableCell>
-                    <TableCell>{org.location}</TableCell>
+                    <TableCell>{org.companyLocation}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {getStatusIcon(org.verifiedStatus)}
@@ -388,7 +438,7 @@ export default function MaintainerOrganizationsPage() {
       <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Review Organization: {selectedOrganization?.name}</DialogTitle>
+            <DialogTitle>Review Organization: {selectedOrganization?.organizationName}</DialogTitle>
             <DialogDescription>
               Review and approve/reject this organization verification
             </DialogDescription>
@@ -409,7 +459,7 @@ export default function MaintainerOrganizationsPage() {
               </div>
               <div>
                 <Label className="text-sm font-medium">Location</Label>
-                <p className="text-sm text-muted-foreground">{selectedOrganization?.location}</p>
+                <p className="text-sm text-muted-foreground">{selectedOrganization?.companyLocation}</p>
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
@@ -452,4 +502,5 @@ export default function MaintainerOrganizationsPage() {
       </div>
     </DashboardLayout>
   )
+}
 }

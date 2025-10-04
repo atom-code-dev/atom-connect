@@ -2,92 +2,53 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/layout/DashboardLayout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Users, Building, BookOpen, TrendingUp, AlertCircle, CheckCircle, Clock, Star, Eye } from "lucide-react"
 
-// Dummy data for maintainer dashboard
-const dashboardStats = {
-  pendingReviews: 15,
-  activeTrainings: 45,
-  organizations: 23,
-  freelancers: 156,
-  completedReviews: 89,
-  averageReviewTime: "2.5 hours",
+interface DashboardStats {
+  pendingReviews: number
+  activeTrainings: number
+  organizations: number
+  freelancers: number
+  completedReviews: number
+  averageReviewTime: string
 }
 
-const recentReviews = [
-  {
-    id: "1",
-    type: "organization",
-    name: "TechCorp Solutions",
-    action: "Verification Review",
-    status: "APPROVED",
-    time: "2 hours ago",
-    reviewer: "Alice Johnson",
-  },
-  {
-    id: "2",
-    type: "training",
-    name: "React.js Advanced Training",
-    action: "Training Review",
-    status: "PENDING",
-    time: "4 hours ago",
-    reviewer: "Bob Smith",
-  },
-  {
-    id: "3",
-    type: "freelancer",
-    name: "John Doe",
-    action: "Profile Review",
-    status: "REJECTED",
-    time: "6 hours ago",
-    reviewer: "Carol Davis",
-  },
-  {
-    id: "4",
-    type: "organization",
-    name: "Code Academy",
-    action: "Verification Review",
-    status: "APPROVED",
-    time: "8 hours ago",
-    reviewer: "David Wilson",
-  },
-]
+interface RecentReview {
+  id: string
+  type: string
+  name: string
+  action: string
+  status: string
+  time: string
+  reviewer: string
+}
 
-const pendingItems = [
-  {
-    id: "1",
-    type: "organization",
-    name: "Innovation Labs",
-    submittedBy: "Jane Smith",
-    submittedDate: "2024-01-20",
-    priority: "HIGH",
-  },
-  {
-    id: "2",
-    type: "training",
-    name: "Python Fundamentals Course",
-    submittedBy: "Code University",
-    submittedDate: "2024-01-19",
-    priority: "MEDIUM",
-  },
-  {
-    id: "3",
-    type: "freelancer",
-    name: "Alice Brown",
-    submittedBy: "alice@example.com",
-    submittedDate: "2024-01-18",
-    priority: "LOW",
-  },
-]
+interface PendingItem {
+  id: string
+  type: string
+  name: string
+  submittedBy: string
+  submittedDate: string
+  priority: string
+}
+
+interface DashboardData {
+  stats: DashboardStats
+  recentReviews: RecentReview[]
+  pendingItems: PendingItem[]
+}
 
 export default function MaintainerDashboardOverview() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === "loading") return
@@ -101,9 +62,30 @@ export default function MaintainerDashboardOverview() {
       router.push("/")
       return
     }
+
+    fetchDashboardData()
   }, [session, status, router])
 
-  if (status === "loading") {
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch("/api/maintainer/dashboard")
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch dashboard data")
+      }
+      
+      const data = await response.json()
+      setDashboardData(data)
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err)
+      setError(err instanceof Error ? err.message : "Unknown error")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (status === "loading" || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -114,6 +96,28 @@ export default function MaintainerDashboardOverview() {
   if (!session) {
     return null
   }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={fetchDashboardData}>Retry</Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!dashboardData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  const { stats, recentReviews, pendingItems } = dashboardData
 
   const getPriorityColor = (priority) => {
     switch (priority) {
@@ -153,7 +157,7 @@ export default function MaintainerDashboardOverview() {
         <div className="flex gap-2">
           <Button variant="outline">
             <AlertCircle className="h-4 w-4 mr-2" />
-            {dashboardStats.pendingReviews} Pending
+            {stats.pendingReviews} Pending
           </Button>
           <Button>
             <TrendingUp className="h-4 w-4 mr-2" />
@@ -170,7 +174,7 @@ export default function MaintainerDashboardOverview() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.pendingReviews}</div>
+            <div className="text-2xl font-bold">{stats.pendingReviews}</div>
             <p className="text-xs text-muted-foreground">
               -3 from yesterday
             </p>
@@ -183,7 +187,7 @@ export default function MaintainerDashboardOverview() {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.activeTrainings}</div>
+            <div className="text-2xl font-bold">{stats.activeTrainings}</div>
             <p className="text-xs text-muted-foreground">
               +5 from last week
             </p>
@@ -196,7 +200,7 @@ export default function MaintainerDashboardOverview() {
             <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.organizations}</div>
+            <div className="text-2xl font-bold">{stats.organizations}</div>
             <p className="text-xs text-muted-foreground">
               +2 from last week
             </p>
@@ -209,7 +213,7 @@ export default function MaintainerDashboardOverview() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.freelancers}</div>
+            <div className="text-2xl font-bold">{stats.freelancers}</div>
             <p className="text-xs text-muted-foreground">
               +12 from last week
             </p>
@@ -324,11 +328,11 @@ export default function MaintainerDashboardOverview() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span>Completed Reviews</span>
-                <span className="font-medium">{dashboardStats.completedReviews}</span>
+                <span className="font-medium">{stats.completedReviews}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span>Average Review Time</span>
-                <span className="font-medium">{dashboardStats.averageReviewTime}</span>
+                <span className="font-medium">{stats.averageReviewTime}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span>Approval Rate</span>
