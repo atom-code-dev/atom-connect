@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)
     
     if (!session) {
+      console.log('Unauthorized - no session')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -22,79 +23,133 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     const where: any = {
-      OR: [
-        {
-          name: {
-            contains: search,
-            mode: 'insensitive' as const
+      // Only add search filters if search term is provided
+      ...(search && {
+        OR: [
+          {
+            name: {
+              contains: search,
+              mode: 'insensitive' as const
+            }
+          },
+          {
+            experience: {
+              contains: search,
+              mode: 'insensitive' as const
+            }
           }
-        },
-        {
-          skills: {
-            hasSome: [search]
-          }
-        },
-        {
-          experience: {
-            contains: search,
-            mode: 'insensitive' as const
-          }
-        }
-      ]
+        ]
+      })
     }
 
-    if (trainerType) {
+    if (trainerType && trainerType !== 'ALL') {
       where.trainerType = trainerType as TrainerType
     }
 
-    if (availability) {
+    if (availability && availability !== 'ALL') {
       where.availability = availability as AvailabilityStatus
     }
 
-    const [freelancers, total] = await Promise.all([
-      db.freelancerProfile.findMany({
-        where,
-        include: {
-          user: true,
-          trainings: {
-            include: {
-              category: true,
-              organization: {
-                include: {
-                  user: true
-                }
+    try {
+      const [freelancers, total] = await Promise.all([
+        db.freelancerProfile.findMany({
+          where,
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            },
+            trainings: {
+              select: {
+                id: true,
+                title: true,
+                startDate: true,
+                endDate: true
+              }
+            },
+            feedbacks: {
+              select: {
+                id: true,
+                overallRating: true,
+                createdAt: true
               }
             }
           },
-          feedbacks: {
-            include: {
-              training: true,
-              organization: {
-                include: {
-                  user: true
-                }
-              }
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        },
-        skip,
-        take: limit
-      }),
-      db.freelancerProfile.count({ where })
-    ])
+          orderBy: {
+            createdAt: 'desc'
+          },
+          skip,
+          take: limit
+        }),
+        db.freelancerProfile.count({ where })
+      ])
 
-    return NextResponse.json({
-      freelancers,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit)
-      }
-    })
+      // Calculate rating for each freelancer
+      const freelancersWithRating = freelancers.map(freelancer => {
+        const feedbacks = freelancer.feedbacks || []
+        const avgRating = feedbacks.length > 0 
+          ? feedbacks.reduce((sum, f) => sum + (f.overallRating || 0), 0) / feedbacks.length 
+          : 0
+        
+        // Parse skills if it's a string
+        let skills = []
+        try {
+          if (freelancer.skills && typeof freelancer.skills === 'string') {
+            skills = JSON.parse(freelancer.skills)
+          } else if (Array.isArray(freelancer.skills)) {
+            skills = freelancer.skills
+          }
+        } catch (e) {
+          console.error('Error parsing skills:', e)
+          skills = []
+        }
+        
+        return {
+          id: freelancer.id,
+          name: freelancer.name,
+          email: freelancer.email,
+          phone: freelancer.phone,
+          skills: skills,
+          trainerType: freelancer.trainerType,
+          experience: freelancer.experience,
+          linkedinProfile: freelancer.linkedinProfile,
+          availability: freelancer.availability,
+          location: freelancer.location,
+          rating: Math.round(avgRating * 10) / 10,
+          completedTrainings: freelancer.trainings?.length || 0,
+          profileCompleted: freelancer.profileCompleted,
+          createdAt: freelancer.createdAt,
+          user: {
+            name: freelancer.user?.name,
+            email: freelancer.user?.email
+          }
+        }
+      })
+
+      return NextResponse.json({
+        freelancers: freelancersWithRating,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      })
+    } catch (dbError) {
+      console.error('Database error in freelancers API:', dbError)
+      return NextResponse.json({
+        freelancers: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          pages: 0
+        }
+      })
+    }
   } catch (error) {
     console.error('Error fetching freelancers:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
