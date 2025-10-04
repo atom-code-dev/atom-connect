@@ -44,6 +44,17 @@ interface OrganizationsResponse {
   }
 }
 
+const verificationStatusColors = {
+  VERIFIED: "bg-green-100 text-green-800",
+  PENDING: "bg-yellow-100 text-yellow-800",
+  REJECTED: "bg-red-100 text-red-800",
+}
+
+const activeStatusColors = {
+  ACTIVE: "bg-green-100 text-green-800",
+  INACTIVE: "bg-red-100 text-red-800",
+}
+
 export default function MaintainerOrganizationsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -64,29 +75,6 @@ export default function MaintainerOrganizationsPage() {
     total: 0,
     pages: 0
   })
-
-const verificationStatusColors = {
-  VERIFIED: "bg-green-100 text-green-800",
-  PENDING: "bg-yellow-100 text-yellow-800",
-  REJECTED: "bg-red-100 text-red-800",
-}
-
-const activeStatusColors = {
-  ACTIVE: "bg-green-100 text-green-800",
-  INACTIVE: "bg-red-100 text-red-800",
-}
-
-export default function MaintainerOrganizationsPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
-  
-  const [searchTerm, setSearchTerm] = useState("")
-  const [verificationFilter, setVerificationFilter] = useState("ALL")
-  const [activeFilter, setActiveFilter] = useState("ALL")
-  const [selectedOrganization, setSelectedOrganization] = useState<any>(null)
-  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
-  const [reviewDecision, setReviewDecision] = useState("")
-  const [reviewComments, setReviewComments] = useState("")
 
   useEffect(() => {
     if (status === "loading") return
@@ -502,5 +490,4 @@ export default function MaintainerOrganizationsPage() {
       </div>
     </DashboardLayout>
   )
-}
 }

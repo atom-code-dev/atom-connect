@@ -36,10 +36,10 @@ export default function FreelancerPage() {
     }
     
     setUser({
-      id: session.user.id,
-      email: session.user.email,
-      role: session.user.role,
-      name: session.user.name
+      id: session.user.id || "",
+      email: session.user.email || "",
+      role: session.user.role || "",
+      name: session.user.name || ""
     })
   }, [session, status, router])
 

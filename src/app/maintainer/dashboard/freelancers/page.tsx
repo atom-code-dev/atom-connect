@@ -47,28 +47,6 @@ interface FreelancersResponse {
   }
 }
 
-export default function MaintainerFreelancersPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
-  
-  const [freelancers, setFreelancers] = useState<Freelancer[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("ALL")
-  const [availabilityFilter, setAvailabilityFilter] = useState("ALL")
-  const [trainerTypeFilter, setTrainerTypeFilter] = useState("ALL")
-  const [selectedFreelancer, setSelectedFreelancer] = useState<Freelancer | null>(null)
-  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
-  const [reviewDecision, setReviewDecision] = useState("")
-  const [reviewComments, setReviewComments] = useState("")
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    pages: 0
-  })
-
 const statusColors = {
   APPROVED: "bg-green-100 text-green-800",
   REJECTED: "bg-red-100 text-red-800",
@@ -91,14 +69,23 @@ export default function MaintainerFreelancersPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   
+  const [freelancers, setFreelancers] = useState<Freelancer[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("ALL")
   const [availabilityFilter, setAvailabilityFilter] = useState("ALL")
   const [trainerTypeFilter, setTrainerTypeFilter] = useState("ALL")
-  const [selectedFreelancer, setSelectedFreelancer] = useState<any>(null)
+  const [selectedFreelancer, setSelectedFreelancer] = useState<Freelancer | null>(null)
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
   const [reviewDecision, setReviewDecision] = useState("")
   const [reviewComments, setReviewComments] = useState("")
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0
+  })
 
   useEffect(() => {
     if (status === "loading") return
@@ -499,7 +486,7 @@ export default function MaintainerFreelancersPage() {
               </div>
               <div>
                 <Label className="text-sm font-medium">Trainer Type</Label>
-                <Badge className={trainerTypeColors[selectedFreelancer?.trainerType]}>
+                <Badge className={selectedFreelancer?.trainerType ? trainerTypeColors[selectedFreelancer.trainerType] : ""}>
                   {selectedFreelancer?.trainerType}
                 </Badge>
               </div>
@@ -568,5 +555,4 @@ export default function MaintainerFreelancersPage() {
       </div>
     </DashboardLayout>
   )
-}
 }
