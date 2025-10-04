@@ -28,9 +28,10 @@ interface NavItem {
 interface SidebarProps {
   userRole: string
   pathname: string
+  isMinimized: boolean
 }
 
-const Sidebar = React.memo(({ userRole, pathname }: SidebarProps) => {
+const Sidebar = React.memo(({ userRole, pathname, isMinimized }: SidebarProps) => {
   const getNavItems = useMemo((): NavItem[] => {
     const baseItems = [
       { href: `/${userRole.toLowerCase()}`, label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> }
@@ -79,7 +80,7 @@ const Sidebar = React.memo(({ userRole, pathname }: SidebarProps) => {
       initial={{ x: -100 }}
       animate={{ x: 0 }}
       transition={{ duration: 0.3, delay: 0.1 }}
-      className="w-64 bg-card border-r flex flex-col"
+      className={`${isMinimized ? 'w-16' : 'w-64'} bg-card border-r flex flex-col transition-all duration-300`}
     >
       <nav className="flex-1 mt-6">
         <div className="px-4 space-y-1">
@@ -92,14 +93,17 @@ const Sidebar = React.memo(({ userRole, pathname }: SidebarProps) => {
                 key={item.href}
                 href={item.href}
                 className="flex items-center justify-between w-full px-4 py-2 text-sm hover:bg-accent rounded-md transition-colors group"
+                title={isMinimized ? item.label : undefined}
               >
                 <div className="flex items-center gap-3">
                   {item.icon}
-                  <span className={isActive ? "font-medium text-primary" : ""}>
-                    {item.label}
-                  </span>
+                  {!isMinimized && (
+                    <span className={isActive ? "font-medium text-primary" : ""}>
+                      {item.label}
+                    </span>
+                  )}
                 </div>
-                {isActive && (
+                {!isMinimized && isActive && (
                   <ChevronRight className="h-4 w-4 text-primary" />
                 )}
               </Link>
@@ -117,6 +121,11 @@ export function DashboardLayout({ children, userRole, userName }: DashboardLayou
   const { data: session, status } = useSession()
   const router = useRouter()
   const pathname = usePathname()
+  const [isSidebarMinimized, setIsSidebarMinimized] = React.useState(false)
+
+  const toggleSidebar = React.useCallback(() => {
+    setIsSidebarMinimized(prev => !prev)
+  }, [])
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -148,6 +157,8 @@ export function DashboardLayout({ children, userRole, userName }: DashboardLayou
       <Topbar 
         userRole={userRole}
         userName={userName}
+        isSidebarMinimized={isSidebarMinimized}
+        onToggleSidebar={toggleSidebar}
       />
       
       <div className="flex flex-1 overflow-hidden pt-16"> {/* Added padding-top for fixed topbar */}
@@ -155,6 +166,7 @@ export function DashboardLayout({ children, userRole, userName }: DashboardLayou
         <Sidebar 
           userRole={userRole}
           pathname={pathname}
+          isMinimized={isSidebarMinimized}
         />
         
         {/* Main content */}

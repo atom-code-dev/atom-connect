@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Separator } from "@/components/ui/separator"
-import { LogOut, Home, Settings, Key, User } from "lucide-react"
+import { LogOut, Home, Settings, Key, User, Minimize2, Maximize2 } from "lucide-react"
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler"
 import { ResetPasswordDialog } from "@/components/auth/ResetPasswordDialog"
 import Link from "next/link"
@@ -17,9 +17,11 @@ import Link from "next/link"
 interface TopbarProps {
   userRole: string
   userName: string
+  isSidebarMinimized: boolean
+  onToggleSidebar: () => void
 }
 
-export function Topbar({ userRole, userName }: TopbarProps) {
+export function Topbar({ userRole, userName, isSidebarMinimized, onToggleSidebar }: TopbarProps) {
   const { data: session } = useSession()
   const pathname = usePathname()
 
@@ -45,6 +47,19 @@ export function Topbar({ userRole, userName }: TopbarProps) {
     >
       {/* Left side - Breadcrumb/Navigation */}
       <div className="flex items-center gap-3">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={onToggleSidebar}
+          className="h-8 w-8 p-0 hover:bg-accent"
+          title={isSidebarMinimized ? "Expand sidebar" : "Minimize sidebar"}
+        >
+          {isSidebarMinimized ? (
+            <Maximize2 className="h-4 w-4" />
+          ) : (
+            <Minimize2 className="h-4 w-4" />
+          )}
+        </Button>
         <Link href={getDashboardPath()}>
           <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
             <Home className="h-4 w-4 text-white" />
