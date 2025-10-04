@@ -281,8 +281,8 @@ export default function MaintainerAnalyticsPage() {
         {/* Review History */}
         <Card>
           <CardHeader>
-            <CardTitle>Review History</CardTitle>
-            <CardDescription>Recent review activities and decisions</CardDescription>
+            <CardTitle>Your Approved Reviews</CardTitle>
+            <CardDescription>Organizations and freelancers you have approved</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border">

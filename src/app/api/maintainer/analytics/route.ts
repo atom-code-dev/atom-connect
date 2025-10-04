@@ -87,12 +87,15 @@ export async function GET(request: NextRequest) {
       currentDate.setMonth(currentDate.getMonth() + 1)
     }
 
-    // Get review history
+    // Get review history - only approved reviews
     const reviewHistory = []
     
-    // Get recent organizations as review history
-    const recentOrganizations = await db.organizationProfile.findMany({
-      where: typeFilter === "ALL" ? {} : { type: typeFilter as any },
+    // Get approved organizations as review history
+    const approvedOrganizations = await db.organizationProfile.findMany({
+      where: {
+        verifiedStatus: "VERIFIED",
+        ...(typeFilter === "ALL" ? {} : { type: typeFilter as any })
+      },
       include: {
         user: {
           select: {
@@ -101,26 +104,29 @@ export async function GET(request: NextRequest) {
         }
       },
       orderBy: {
-        createdAt: 'desc'
+        updatedAt: 'desc' // Use updatedAt to show when it was last modified/approved
       },
-      take: 10
+      take: 15
     })
 
-    recentOrganizations.forEach(org => {
+    approvedOrganizations.forEach(org => {
       reviewHistory.push({
         id: `org-${org.id}`,
         type: "ORGANIZATION" as const,
         entityName: org.organizationName,
-        status: org.verifiedStatus,
-        reviewedBy: org.user.name || "Unknown",
-        reviewedAt: org.createdAt.toISOString(),
-        comments: org.verifiedStatus === "PENDING" ? "Pending verification" : "Review completed"
+        status: "APPROVED",
+        reviewedBy: session.user?.name || "Current Maintainer",
+        reviewedAt: org.updatedAt.toISOString(),
+        comments: "Organization verification approved"
       })
     })
 
-    // Get recent freelancers as review history
-    const recentFreelancers = await db.freelancerProfile.findMany({
-      where: typeFilter === "ALL" ? {} : {},
+    // Get approved freelancers as review history
+    const approvedFreelancers = await db.freelancerProfile.findMany({
+      where: {
+        profileCompleted: true,
+        ...(typeFilter === "ALL" ? {} : {})
+      },
       include: {
         user: {
           select: {
@@ -129,20 +135,20 @@ export async function GET(request: NextRequest) {
         }
       },
       orderBy: {
-        createdAt: 'desc'
+        updatedAt: 'desc' // Use updatedAt to show when it was last modified/approved
       },
-      take: 10
+      take: 15
     })
 
-    recentFreelancers.forEach(freelancer => {
+    approvedFreelancers.forEach(freelancer => {
       reviewHistory.push({
         id: `freelancer-${freelancer.id}`,
         type: "FREELANCER" as const,
         entityName: freelancer.name,
-        status: freelancer.profileCompleted ? "APPROVED" : "PENDING",
-        reviewedBy: freelancer.user.name || "Unknown",
-        reviewedAt: freelancer.createdAt.toISOString(),
-        comments: freelancer.profileCompleted ? "Profile completed" : "Profile pending review"
+        status: "APPROVED",
+        reviewedBy: session.user?.name || "Current Maintainer",
+        reviewedAt: freelancer.updatedAt.toISOString(),
+        comments: "Freelancer profile approved"
       })
     })
 
