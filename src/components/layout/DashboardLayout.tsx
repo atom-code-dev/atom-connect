@@ -92,11 +92,15 @@ const Sidebar = React.memo(({ userRole, pathname, isMinimized }: SidebarProps) =
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center justify-between w-full px-4 py-2 text-sm hover:bg-accent rounded-md transition-colors group"
+                className={`flex items-center justify-between w-full px-4 py-2 text-sm hover:bg-accent rounded-md transition-colors group ${
+                  isActive ? (isMinimized ? 'bg-primary/10' : 'bg-accent') : ''
+                }`}
                 title={isMinimized ? item.label : undefined}
               >
                 <div className="flex items-center gap-3">
-                  {item.icon}
+                  <div className={`p-1 rounded ${isActive && isMinimized ? 'bg-primary text-primary-foreground' : ''}`}>
+                    {item.icon}
+                  </div>
                   {!isMinimized && (
                     <span className={isActive ? "font-medium text-primary" : ""}>
                       {item.label}
@@ -123,9 +127,20 @@ export function DashboardLayout({ children, userRole, userName }: DashboardLayou
   const pathname = usePathname()
   const [isSidebarMinimized, setIsSidebarMinimized] = React.useState(false)
 
-  const toggleSidebar = React.useCallback(() => {
-    setIsSidebarMinimized(prev => !prev)
+  // Load sidebar state from localStorage on mount
+  React.useEffect(() => {
+    const savedState = localStorage.getItem('sidebar-minimized')
+    if (savedState !== null) {
+      setIsSidebarMinimized(savedState === 'true')
+    }
   }, [])
+
+  // Save sidebar state to localStorage when it changes
+  const toggleSidebar = React.useCallback(() => {
+    const newState = !isSidebarMinimized
+    setIsSidebarMinimized(newState)
+    localStorage.setItem('sidebar-minimized', newState.toString())
+  }, [isSidebarMinimized])
 
   useEffect(() => {
     if (status === "unauthenticated") {
