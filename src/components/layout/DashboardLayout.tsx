@@ -64,6 +64,7 @@ const Sidebar = React.memo(({ userRole, pathname, isMinimized }: SidebarProps) =
         return [
           ...baseItems,
           { href: "/maintainer/dashboard/reviews", label: "Reviews", icon: <Star className="h-4 w-4" /> },
+          { href: "/maintainer/dashboard/analytics", label: "Analytics", icon: <LayoutDashboard className="h-4 w-4" /> },
           { href: "/maintainer/dashboard/trainings", label: "Trainings", icon: <BookOpen className="h-4 w-4" /> },
           { href: "/maintainer/dashboard/organizations", label: "Organizations", icon: <Building className="h-4 w-4" /> },
           { href: "/maintainer/dashboard/freelancers", label: "Freelancers", icon: <Users className="h-4 w-4" /> },
