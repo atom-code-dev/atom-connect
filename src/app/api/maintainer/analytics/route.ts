@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       
       // Count reviews for this month
       const [organizationReviews, freelancerReviews] = await Promise.all([
-        db.organization.count({
+        db.organizationProfile.count({
           where: {
             createdAt: {
               gte: monthStart,
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
             }
           }
         }),
-        db.freelancer.count({
+        db.freelancerProfile.count({
           where: {
             createdAt: {
               gte: monthStart,
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
     const reviewHistory = []
     
     // Get recent organizations as review history
-    const recentOrganizations = await db.organization.findMany({
+    const recentOrganizations = await db.organizationProfile.findMany({
       where: typeFilter === "ALL" ? {} : { type: typeFilter as any },
       include: {
         user: {
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Get recent freelancers as review history
-    const recentFreelancers = await db.freelancer.findMany({
+    const recentFreelancers = await db.freelancerProfile.findMany({
       where: typeFilter === "ALL" ? {} : {},
       include: {
         user: {
