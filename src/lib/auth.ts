@@ -27,6 +27,14 @@ interface CustomSession extends Session {
   error?: string
 }
 
+// Add initialization logging
+console.log('LinkedIn OAuth - Auth options initialized:', {
+  hasClientId: !!process.env.LINKEDIN_CLIENT_ID,
+  hasClientSecret: !!process.env.LINKEDIN_CLIENT_SECRET,
+  nextAuthUrl: process.env.NEXTAUTH_URL,
+  authSecret: !!process.env.AUTH_SECRET
+})
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "your-secret-key",
   providers: [

@@ -129,18 +129,26 @@ export default function LoginPage() {
       const callbackUrl = "/complete-profile"
       console.log('LinkedIn OAuth - Using callback URL:', callbackUrl)
       
+      // Try without redirect: true to see if we get a proper response
       const result = await signIn("linkedin", { 
         callbackUrl,
-        redirect: true  // Let NextAuth handle the redirect
+        redirect: false  // Don't redirect automatically, handle it manually
       })
       
       console.log('LinkedIn OAuth - Login result:', result)
       
-      // If we get here, it means the redirect didn't happen
       if (result?.error) {
         console.error('LinkedIn OAuth - Login error:', result.error)
         setError("LinkedIn login failed")
         toast.error("LinkedIn login failed. Please try again.")
+      } else if (result?.url) {
+        console.log('LinkedIn OAuth - Redirecting to:', result.url)
+        // Manually redirect to the URL provided by NextAuth
+        window.location.href = result.url
+      } else {
+        console.log('LinkedIn OAuth - No result URL, this might indicate a configuration issue')
+        setError("LinkedIn login configuration issue")
+        toast.error("LinkedIn login is not properly configured. Please contact support.")
       }
     } catch (err) {
       console.error('LinkedIn OAuth - Login exception:', err)
