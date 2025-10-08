@@ -22,7 +22,9 @@ interface CustomSession extends Session {
     email: string
     name: string
     role: UserRole
+    isNewUser?: boolean
   }
+  error?: string
 }
 
 export const authOptions: NextAuthOptions = {
@@ -103,26 +105,13 @@ export const authOptions: NextAuthOptions = {
         params: {
           scope: "openid profile email",
           response_type: "code",
+          redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/linkedin`,
         },
-      },
-      token: {
-        async request({ client, params, checks }) {
-          try {
-            const response = await client.oauthCallback(
-              process.env.NEXTAUTH_URL + "/api/auth/callback/linkedin", 
-              params, 
-              checks
-            )
-            return { tokens: response }
-          } catch (error) {
-            console.error("LinkedIn token request error:", error)
-            throw error
-          }
-        }
       },
       userinfo: {
         async request({ tokens, client }) {
           try {
+            console.log('Requesting LinkedIn userinfo with access token')
             // Get user info from LinkedIn API
             const response = await fetch("https://api.linkedin.com/v2/userinfo", {
               headers: {
@@ -131,6 +120,8 @@ export const authOptions: NextAuthOptions = {
             })
             
             if (!response.ok) {
+              const errorText = await response.text()
+              console.error('LinkedIn API error response:', errorText)
               throw new Error(`LinkedIn API error: ${response.status} ${response.statusText}`)
             }
             
