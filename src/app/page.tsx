@@ -36,13 +36,6 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      // Check for LinkedIn authentication errors
-      if (session.error) {
-        setError(session.error)
-        toast.error(session.error)
-        return
-      }
-      
       // Check if user is new and needs to complete profile
       if (session.user.isNewUser) {
         router.push("/complete-profile")
@@ -122,35 +115,35 @@ export default function LoginPage() {
 
   const handleLinkedInLogin = async () => {
     try {
-      console.log('Starting LinkedIn login process...')
+      console.log('LinkedIn OAuth - Starting LinkedIn login process...')
       
       // Check if environment variables are set
       if (!process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID) {
-        console.error('NEXT_PUBLIC_LINKEDIN_CLIENT_ID is not set:', process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID)
+        console.error('LinkedIn OAuth - NEXT_PUBLIC_LINKEDIN_CLIENT_ID is not set:', process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID)
         setError("LinkedIn login is not configured")
         toast.error("LinkedIn login is not properly configured. Please contact support.")
         return
       }
       
-      // Use the correct callback URL
-      const callbackUrl = window.location.origin + "/complete-profile"
-      console.log('Using callback URL:', callbackUrl)
+      // Use the correct callback URL - let NextAuth handle the redirect
+      const callbackUrl = "/complete-profile"
+      console.log('LinkedIn OAuth - Using callback URL:', callbackUrl)
       
       const result = await signIn("linkedin", { 
         callbackUrl,
         redirect: true  // Let NextAuth handle the redirect
       })
       
-      console.log('LinkedIn login result:', result)
+      console.log('LinkedIn OAuth - Login result:', result)
       
       // If we get here, it means the redirect didn't happen
       if (result?.error) {
-        console.error('LinkedIn login error:', result.error)
+        console.error('LinkedIn OAuth - Login error:', result.error)
         setError("LinkedIn login failed")
         toast.error("LinkedIn login failed. Please try again.")
       }
     } catch (err) {
-      console.error('LinkedIn login exception:', err)
+      console.error('LinkedIn OAuth - Login exception:', err)
       setError("LinkedIn login failed. Please try again.")
       toast.error("An error occurred during LinkedIn login.")
     }

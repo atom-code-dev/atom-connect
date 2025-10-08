@@ -105,13 +105,12 @@ export const authOptions: NextAuthOptions = {
         params: {
           scope: "openid profile email",
           response_type: "code",
-          redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback/linkedin`,
         },
       },
       userinfo: {
         async request({ tokens, client }) {
           try {
-            console.log('Requesting LinkedIn userinfo with access token')
+            console.log('LinkedIn OAuth - Requesting userinfo with access token:', tokens.access_token ? 'PRESENT' : 'MISSING')
             // Get user info from LinkedIn API
             const response = await fetch("https://api.linkedin.com/v2/userinfo", {
               headers: {
@@ -119,24 +118,26 @@ export const authOptions: NextAuthOptions = {
               },
             })
             
+            console.log('LinkedIn OAuth - Userinfo response status:', response.status)
+            
             if (!response.ok) {
               const errorText = await response.text()
-              console.error('LinkedIn API error response:', errorText)
+              console.error('LinkedIn OAuth - API error response:', errorText)
               throw new Error(`LinkedIn API error: ${response.status} ${response.statusText}`)
             }
             
             const profile = await response.json()
-            console.log('LinkedIn userinfo received:', profile)
+            console.log('LinkedIn OAuth - Userinfo received:', JSON.stringify(profile, null, 2))
             
             return profile
           } catch (error) {
-            console.error("LinkedIn userinfo request error:", error)
+            console.error("LinkedIn OAuth - Userinfo request error:", error)
             throw error
           }
         }
       },
       profile(profile) {
-        console.log('LinkedIn profile received:', profile)
+        console.log('LinkedIn OAuth - Processing profile:', JSON.stringify(profile, null, 2))
         
         // Handle the new LinkedIn API format
         const id = profile.sub || profile.id
@@ -144,8 +145,10 @@ export const authOptions: NextAuthOptions = {
         const email = profile.email || profile.email_address || ''
         const picture = profile.picture || profile.image
         
+        console.log('LinkedIn OAuth - Extracted data:', { id, name, email: email ? 'PRESENT' : 'MISSING', picture: picture ? 'PRESENT' : 'MISSING' })
+        
         if (!email) {
-          console.error('LinkedIn profile missing email:', profile)
+          console.error('LinkedIn OAuth - Profile missing email:', profile)
           throw new Error('Email is required from LinkedIn profile')
         }
         
@@ -164,15 +167,27 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user, account }: { token: JWT; user?: CustomUser; account?: any }) {
+      console.log('LinkedIn OAuth - JWT callback called:', { 
+        hasToken: !!token, 
+        hasUser: !!user, 
+        hasAccount: !!account,
+        accountProvider: account?.provider 
+      })
+      
       if (user) {
         token.role = user.role
         token.id = user.id
+        console.log('LinkedIn OAuth - User data added to token:', { role: user.role, id: user.id })
       }
       
       // Handle LinkedIn sign-in
       if (account?.provider === "linkedin") {
+        console.log('LinkedIn OAuth - Processing LinkedIn account')
         try {
-          console.log('LinkedIn callback - token:', { email: token.email, name: token.name })
+          console.log('LinkedIn OAuth - Token data:', { 
+            email: token.email ? 'PRESENT' : 'MISSING', 
+            name: token.name ? 'PRESENT' : 'MISSING' 
+          })
           
           // Validate required fields
           if (!token.email) {
@@ -185,7 +200,7 @@ export const authOptions: NextAuthOptions = {
           })
 
           if (!existingUser) {
-            console.log('Creating new user from LinkedIn OAuth')
+            console.log('LinkedIn OAuth - Creating new user from LinkedIn OAuth')
             // New user - create temporary password and user record
             const tempPassword = Math.random().toString(36).slice(-12)
             const hashedPassword = await bcrypt.hash(tempPassword, 12)
@@ -210,12 +225,12 @@ export const authOptions: NextAuthOptions = {
             token.id = newUser.id
             token.role = newUser.role
             token.isNewUser = true
-            console.log('New user created successfully:', newUser.id)
+            console.log('LinkedIn OAuth - New user created successfully:', newUser.id)
           } else {
-            console.log('Existing user found:', existingUser.id)
+            console.log('LinkedIn OAuth - Existing user found:', existingUser.id)
             // Existing user - check if they are a freelancer
             if (existingUser.role !== "FREELANCER") {
-              console.error('Non-freelancer attempting LinkedIn login:', existingUser.role)
+              console.error('LinkedIn OAuth - Non-freelancer attempting LinkedIn login:', existingUser.role)
               throw new Error("Only freelancers can use LinkedIn login")
             }
             
@@ -223,26 +238,38 @@ export const authOptions: NextAuthOptions = {
             token.role = existingUser.role
             token.isNewUser = false
           }
+          
+          console.log('LinkedIn OAuth - JWT callback completed successfully')
         } catch (error) {
-          console.error("Error in LinkedIn callback:", error)
-          // Instead of throwing, we'll set an error flag that can be handled in the session
-          token.error = error instanceof Error ? error.message : "LinkedIn authentication failed"
+          console.error("LinkedIn OAuth - Error in JWT callback:", error)
+          // Throw the error to be handled by NextAuth
+          throw error
         }
       }
       
       return token
     },
     async session({ session, token }: { session: Session; token: JWT }) {
+      console.log('LinkedIn OAuth - Session callback called:', { 
+        hasSession: !!session, 
+        hasToken: !!token,
+        tokenId: token.id,
+        tokenRole: token.role,
+        isNewUser: token.isNewUser
+      })
+      
       if (token && session.user) {
         session.user.id = token.id as string
         session.user.role = token.role as UserRole
         session.user.isNewUser = token.isNewUser as boolean
-        
-        // Check for LinkedIn authentication errors
-        if (token.error) {
-          session.error = token.error as string
-        }
+        console.log('LinkedIn OAuth - Session data set:', { 
+          id: token.id, 
+          role: token.role, 
+          isNewUser: token.isNewUser 
+        })
       }
+      
+      console.log('LinkedIn OAuth - Session callback completed')
       return session
     }
   },

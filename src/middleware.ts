@@ -7,7 +7,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/', '/register-organization']
+  const publicRoutes = ['/', '/register-organization', '/complete-profile', '/privacy', '/terms']
   
   // Routes that should check status before allowing access
   const protectedRoutes = ['/organization', '/freelancer']
