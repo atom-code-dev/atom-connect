@@ -25,6 +25,15 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const router = useRouter()
 
+  // Debug: Log environment variables on component mount
+  useEffect(() => {
+    console.log('Environment variables check:')
+    console.log('NEXT_PUBLIC_LINKEDIN_CLIENT_ID:', process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID)
+    console.log('All NEXT_PUBLIC_ vars:', {
+      NEXT_PUBLIC_LINKEDIN_CLIENT_ID: process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID,
+    })
+  }, [])
+
   useEffect(() => {
     if (status === "authenticated") {
       // Check for LinkedIn authentication errors
@@ -116,7 +125,8 @@ export default function LoginPage() {
       console.log('Starting LinkedIn login process...')
       
       // Check if environment variables are set
-      if (!process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID && !process.env.LINKEDIN_CLIENT_ID) {
+      if (!process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID) {
+        console.error('NEXT_PUBLIC_LINKEDIN_CLIENT_ID is not set:', process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID)
         setError("LinkedIn login is not configured")
         toast.error("LinkedIn login is not properly configured. Please contact support.")
         return
