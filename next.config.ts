@@ -27,18 +27,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: https: blob:",
-              "font-src 'self' data:",
-              "connect-src 'self' https://api.linkedin.com https://www.linkedin.com",
-              "frame-src 'self' https://www.linkedin.com",
-              "form-action 'self'",
-              "base-uri 'self'",
-              "frame-ancestors 'none'",
-            ].join(' '),
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://api.linkedin.com https://www.linkedin.com; frame-src 'self' https://www.linkedin.com; form-action 'self'; base-uri 'self'; frame-ancestors 'none';",
           },
           {
             key: 'X-Frame-Options',
