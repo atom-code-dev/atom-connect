@@ -1,25 +1,24 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
   typescript: {
     ignoreBuildErrors: true,
   },
-  // 禁用 Next.js 热重载，由 nodemon 处理重编译
-  reactStrictMode: false,
-  webpack: (config, { dev }) => {
-    if (dev) {
-      // 禁用 webpack 的热模块替换
-      config.watchOptions = {
-        ignored: ['**/*'], // 忽略所有文件变化
-      };
-    }
-    return config;
-  },
+  reactStrictMode: true,
   eslint: {
-    // 构建时忽略ESLint错误
     ignoreDuringBuilds: true,
   },
+  // Remove standalone output for development
+  // output: 'standalone',
+  // Ensure proper asset handling
+  assetPrefix: process.env.NODE_ENV === 'production' ? '' : '',
+  // Enable trailing slash for consistent routing
+  trailingSlash: false,
+  // Allow cross-origin requests from Z.ai preview
+  allowedDevOrigins: [
+    'preview-chat-ee94d2ac-0501-41f0-b15e-6f29f8d45aa0.space.z.ai',
+    'localhost:3000'
+  ],
 };
 
 export default nextConfig;

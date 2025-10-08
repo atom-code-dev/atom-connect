@@ -19,6 +19,9 @@
 
 # production
 /build
+#etc
+/db
+/examples
 
 # misc
 .DS_Store
@@ -47,3 +50,5 @@ test
 prompt
 
 server.log
+
+package-lock.json
